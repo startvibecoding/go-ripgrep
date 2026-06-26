@@ -2,7 +2,7 @@ package searcher
 
 import (
 	"bytes"
-	"go-ripgrep/pkg/matcher"
+	"github.com/startvibecoding/go-ripgrep/pkg/matcher"
 	"testing"
 )
 

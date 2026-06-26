@@ -111,8 +111,8 @@ package main
 import (
     "context"
     "fmt"
-    goriggrep "go-ripgrep"
-    "go-ripgrep/pkg/printer"
+    goriggrep "github.com/startvibecoding/go-ripgrep"
+    "github.com/startvibecoding/go-ripgrep/pkg/printer"
 )
 
 func main() {

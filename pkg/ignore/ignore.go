@@ -3,7 +3,7 @@ package ignore
 import (
 	"bufio"
 	"bytes"
-	"go-ripgrep/pkg/globset"
+	"github.com/startvibecoding/go-ripgrep/pkg/globset"
 	"os"
 	"os/exec"
 	"path/filepath"

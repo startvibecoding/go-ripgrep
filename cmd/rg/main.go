@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"go-ripgrep"
-	"go-ripgrep/pkg/ignore"
-	"go-ripgrep/pkg/matcher"
-	"go-ripgrep/pkg/printer"
-	"go-ripgrep/pkg/searcher"
+
+	goriggrep "github.com/startvibecoding/go-ripgrep"
+	"github.com/startvibecoding/go-ripgrep/pkg/ignore"
+	"github.com/startvibecoding/go-ripgrep/pkg/matcher"
+	"github.com/startvibecoding/go-ripgrep/pkg/printer"
+	"github.com/startvibecoding/go-ripgrep/pkg/searcher"
 	"io"
 	"os"
 	"sort"

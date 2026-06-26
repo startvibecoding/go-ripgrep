@@ -6,7 +6,7 @@ Guidance for AI coding agents working in this repository. Read this before explo
 
 - **What it is:** `go-ripgrep` — a pure-Go port of [ripgrep](https://github.com/BurntSushi/ripgrep). It ships both a CLI tool (`rg`) that mirrors ripgrep's interface and an embeddable Go SDK.
 - **Language:** Go (module requires Go **1.26+**, see `go.mod`).
-- **Dependencies:** None — standard library only (`go.mod` has no `require` block). Keep it that way unless there's a strong reason.
+- **Dependencies:** Standard library plus `golang.org/x/sys` for CPU feature detection. Keep dependencies limited to this unless there's a strong reason.
 - **Distribution:** Single static binary; cross-compiled for Linux (amd64/arm64/loong64), macOS (amd64/arm64), Windows (amd64/arm64); also published as npm packages.
 - **License:** MIT.
 
@@ -31,7 +31,7 @@ Guidance for AI coding agents working in this repository. Read this before explo
 - **Concurrency:** One walker goroutine feeds `filesChan` (cap `threads*4`); N worker goroutines search files and feed `outChan` (cap `threads*2`); a closer goroutine `wg.Wait()`s then closes `outChan`. Default worker count is `runtime.NumCPU()` (overridable via `Options.Threads`).
 - **Cancellation:** Every goroutine checks `ctx.Done()` at directory, file, and channel-op boundaries. Preserve these checks when editing the walker or workers.
 - **No shared mutable state:** data flows through channels; avoid introducing mutexes unless unavoidable.
-- **Module path quirk:** the module is `go-ripgrep` and the root package is named `goriggrep` (note the spelling). Internal imports use paths like `go-ripgrep/pkg/matcher`. Don't "fix" the package name casually — it would break imports across the codebase.
+- **Module path quirk:** the module is `github.com/startvibecoding/go-ripgrep` and the root package is named `goriggrep` (note the spelling). Internal imports use paths like `github.com/startvibecoding/go-ripgrep/pkg/matcher`. Don't "fix" the package name casually — it would break imports across the codebase.
 
 ## Build / test / run commands
 
@@ -52,7 +52,7 @@ npm packaging: `make npm-version`, `make npm-packages`, `make npm-pack`, `make n
 ## Coding conventions and working rules
 
 - Format with `gofmt`/`goimports` before committing (`make fmt`). Code must pass `go vet ./...` cleanly.
-- Keep the standard-library-only constraint; do not add third-party dependencies without strong justification.
+- Keep the dependency footprint minimal; do not add third-party dependencies beyond the existing official `golang.org/x/sys` use without strong justification.
 - Match existing style: small focused packages under `pkg/`, table-driven tests in `*_test.go` next to the code.
 - Add/extend tests for behavior changes — unit tests in the relevant `pkg/` and end-to-end coverage in `tests/integration_test.go`.
 - Maintain ripgrep CLI compatibility: when touching `cmd/rg/main.go`, keep flag names/semantics aligned with ripgrep and update `docs/cli-reference.md`.

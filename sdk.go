@@ -2,11 +2,11 @@ package goriggrep
 
 import (
 	"context"
-	"go-ripgrep/pkg/globset"
-	"go-ripgrep/pkg/ignore"
-	"go-ripgrep/pkg/matcher"
-	"go-ripgrep/pkg/printer"
-	"go-ripgrep/pkg/searcher"
+	"github.com/startvibecoding/go-ripgrep/pkg/globset"
+	"github.com/startvibecoding/go-ripgrep/pkg/ignore"
+	"github.com/startvibecoding/go-ripgrep/pkg/matcher"
+	"github.com/startvibecoding/go-ripgrep/pkg/printer"
+	"github.com/startvibecoding/go-ripgrep/pkg/searcher"
 	"os"
 	"path/filepath"
 	"runtime"

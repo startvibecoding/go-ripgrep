@@ -14,8 +14,8 @@ go get github.com/startvibecoding/go-ripgrep
 
 ```go
 import (
-    goriggrep "go-ripgrep"
-    "go-ripgrep/pkg/printer"
+    goriggrep "github.com/startvibecoding/go-ripgrep"
+    "github.com/startvibecoding/go-ripgrep/pkg/printer"
 )
 ```
 
@@ -358,8 +358,8 @@ import (
     "os"
     "time"
 
-    goriggrep "go-ripgrep"
-    "go-ripgrep/pkg/printer"
+    goriggrep "github.com/startvibecoding/go-ripgrep"
+    "github.com/startvibecoding/go-ripgrep/pkg/printer"
 )
 
 func main() {
