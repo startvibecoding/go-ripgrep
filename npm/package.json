@@ -1,0 +1,46 @@
+{
+  "name": "go-ripgrep",
+  "version": "15.1.0-go",
+  "description": "A high-performance line-oriented search tool and Go SDK port of ripgrep",
+  "bin": {
+    "rg": "bin/rg"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "README.md"
+  ],
+  "keywords": [
+    "ripgrep",
+    "rg",
+    "search",
+    "find",
+    "grep",
+    "regex",
+    "fast",
+    "go"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/startvibecoding/go-ripgrep.git",
+    "directory": "npm"
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "optionalDependencies": {
+    "go-ripgrep-linux-x64": "15.1.0-go",
+    "go-ripgrep-linux-arm64": "15.1.0-go",
+    "go-ripgrep-linux-loong64": "15.1.0-go",
+    "go-ripgrep-linux-musl-x64": "15.1.0-go",
+    "go-ripgrep-darwin-x64": "15.1.0-go",
+    "go-ripgrep-darwin-arm64": "15.1.0-go",
+    "go-ripgrep-win32-x64": "15.1.0-go",
+    "go-ripgrep-win32-arm64": "15.1.0-go"
+  }
+}

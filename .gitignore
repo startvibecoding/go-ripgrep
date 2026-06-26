@@ -1,0 +1,19 @@
+# Go binaries and test outputs
+bin/
+/rg
+*.test
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Node / NPM packaging artifacts
+node_modules/
+npm/packages/
+npm/bin/
+npm/*.tgz
+package-lock.json
+
+# OS files
+.DS_Store
