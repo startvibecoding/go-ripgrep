@@ -1,7 +1,7 @@
 {
   "name": "go-ripgrep",
-  "version": "15.1.0-go",
-  "description": "A high-performance line-oriented search tool and Go SDK port of ripgrep",
+  "version": "0.0.1",
+  "description": "Pure Go ripgrep implementation with AVX2 SIMD acceleration and no CGO dependencies",
   "bin": {
     "rg": "bin/rg"
   },
@@ -15,13 +15,12 @@
   ],
   "keywords": [
     "ripgrep",
-    "rg",
-    "search",
-    "find",
     "grep",
-    "regex",
-    "fast",
-    "go"
+    "search",
+    "pure-go",
+    "simd",
+    "avx2",
+    "cli"
   ],
   "author": "",
   "license": "MIT",
@@ -34,13 +33,15 @@
     "node": ">=14"
   },
   "optionalDependencies": {
-    "go-ripgrep-linux-x64": "15.1.0-go",
-    "go-ripgrep-linux-arm64": "15.1.0-go",
-    "go-ripgrep-linux-loong64": "15.1.0-go",
-    "go-ripgrep-linux-musl-x64": "15.1.0-go",
-    "go-ripgrep-darwin-x64": "15.1.0-go",
-    "go-ripgrep-darwin-arm64": "15.1.0-go",
-    "go-ripgrep-win32-x64": "15.1.0-go",
-    "go-ripgrep-win32-arm64": "15.1.0-go"
+    "go-ripgrep-linux-x64": "0.0.1",
+    "go-ripgrep-linux-arm64": "0.0.1",
+    "go-ripgrep-linux-loong64": "0.0.1",
+    "go-ripgrep-linux-musl-x64": "0.0.1",
+    "go-ripgrep-darwin-x64": "0.0.1",
+    "go-ripgrep-darwin-arm64": "0.0.1",
+    "go-ripgrep-win32-x64": "0.0.1",
+    "go-ripgrep-win32-arm64": "0.0.1",
+    "go-ripgrep-freebsd-x64": "0.0.1",
+    "go-ripgrep-freebsd-arm64": "0.0.1"
   }
 }

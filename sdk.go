@@ -2,6 +2,8 @@ package goriggrep
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"go-ripgrep/pkg/globset"
 	"go-ripgrep/pkg/ignore"
 	"go-ripgrep/pkg/matcher"
@@ -23,12 +25,23 @@ type Options struct {
 	WordRegexp      bool
 	InvertMatch     bool
 
+	// Replacement settings
+	Replace         string
+	HasReplace      bool
+
 	// Filtering settings
 	NoIgnore       bool
 	Hidden         bool
 	FollowSymlinks bool
 	MaxDepth       int
 	Globs          []string // patterns for -g/--glob (negated ones exclude)
+	Types          []string // patterns for -t/--type
+	TypesNot       []string // patterns for -T/--type-not
+	SearchZip      bool     // search inside compressed files
+
+	// Sorting settings
+	SortBy         string // "path", "modified", "size", or "none"
+	SortReverse    bool   // reverse sorting order
 
 	// Context settings
 	BeforeContext int
@@ -60,7 +73,9 @@ func Search(ctx context.Context, paths []string, opts Options) (<-chan printer.F
 
 	// Determine threads count
 	threads := opts.Threads
-	if threads <= 0 {
+	if opts.SortBy != "" && opts.SortBy != "none" {
+		threads = 1
+	} else if threads <= 0 {
 		threads = runtime.NumCPU()
 	}
 
@@ -74,6 +89,12 @@ func Search(ctx context.Context, paths []string, opts Options) (<-chan printer.F
 		go func() {
 			defer wg.Done()
 			s := searcher.NewSearcher(m, opts.BeforeContext, opts.AfterContext, opts.MaxCount, opts.InvertMatch)
+			if opts.HasReplace {
+				s.SetReplace(opts.Replace)
+			}
+			if opts.SearchZip {
+				s.SetSearchZip(true)
+			}
 			for {
 				select {
 				case <-ctx.Done():
@@ -83,16 +104,19 @@ func Search(ctx context.Context, paths []string, opts Options) (<-chan printer.F
 						return
 					}
 					startTime := time.Now()
-					res, err := s.SearchFile(path)
-					if err == nil && res != nil {
-						res.Elapsed = time.Since(startTime)
-						// Send result if there are matches, or if we want to report searched files (e.g. stats)
-						// In typical ripgrep, we only output files with matches.
-						if len(res.Matches) > 0 {
-							select {
-							case <-ctx.Done():
-								return
-							case outChan <- *res:
+					results, err := s.SearchFile(path)
+					if err == nil && len(results) > 0 {
+						elapsed := time.Since(startTime)
+						for _, res := range results {
+							if res != nil {
+								res.Elapsed = elapsed
+								if len(res.Matches) > 0 {
+									select {
+									case <-ctx.Done():
+										return
+									case outChan <- *res:
+									}
+								}
 							}
 						}
 					}
@@ -154,7 +178,8 @@ func Search(ctx context.Context, paths []string, opts Options) (<-chan printer.F
 
 			// Walk directory
 			stack := ignore.NewIgnoreStack(opts.NoIgnore, opts.Hidden, opts.MaxDepth)
-			walkDir(ctx, path, stack, 1, opts.MaxDepth, opts.FollowSymlinks, globSet, filesChan)
+			stack.LoadBaseRules(path)
+			walkDir(ctx, path, stack, 1, opts.MaxDepth, opts.FollowSymlinks, globSet, filesChan, opts.Types, opts.TypesNot, opts.SortBy, opts.SortReverse)
 		}
 	}()
 
@@ -170,6 +195,10 @@ func walkDir(
 	followSymlinks bool,
 	globSet *globset.GlobSet,
 	filesChan chan<- string,
+	types []string,
+	typesNot []string,
+	sortBy string,
+	sortReverse bool,
 ) {
 	select {
 	case <-ctx.Done():
@@ -189,6 +218,7 @@ func walkDir(
 	if err != nil {
 		return
 	}
+	sortDirEntries(dirPath, entries, sortBy, sortReverse)
 
 	for _, entry := range entries {
 		select {
@@ -229,13 +259,73 @@ func walkDir(
 		if isDir {
 			// Clone stack for subdirectories so changes to stack are scoped
 			subStack := stack.Clone()
-			walkDir(ctx, path, subStack, depth+1, maxDepth, followSymlinks, globSet, filesChan)
+			walkDir(ctx, path, subStack, depth+1, maxDepth, followSymlinks, globSet, filesChan, types, typesNot, sortBy, sortReverse)
 		} else {
+			if ignore.ShouldIgnoreByType(entry.Name(), types, typesNot) {
+				continue
+			}
 			select {
 			case <-ctx.Done():
 				return
 			case filesChan <- path:
 			}
+		}
+	}
+}
+
+
+func sortDirEntries(dirPath string, entries []os.DirEntry, sortBy string, reverse bool) {
+	if len(entries) <= 1 || sortBy == "" || sortBy == "none" {
+		return
+	}
+
+	switch sortBy {
+	case "path":
+		sort.Slice(entries, func(i, j int) bool {
+			cmp := strings.Compare(entries[i].Name(), entries[j].Name()) < 0
+			if reverse {
+				return !cmp
+			}
+			return cmp
+		})
+	case "modified", "size":
+		type entryWithInfo struct {
+			entry os.DirEntry
+			info  os.FileInfo
+		}
+		list := make([]entryWithInfo, len(entries))
+		for i, entry := range entries {
+			list[i].entry = entry
+			info, err := entry.Info()
+			if err == nil {
+				list[i].info = info
+			}
+		}
+
+		sort.Slice(list, func(i, j int) bool {
+			var cmp bool
+			infoI, infoJ := list[i].info, list[j].info
+			if infoI == nil && infoJ == nil {
+				cmp = list[i].entry.Name() < list[j].entry.Name()
+			} else if infoI == nil {
+				cmp = false
+			} else if infoJ == nil {
+				cmp = true
+			} else {
+				if sortBy == "modified" {
+					cmp = infoI.ModTime().Before(infoJ.ModTime())
+				} else { // "size"
+					cmp = infoI.Size() < infoJ.Size()
+				}
+			}
+			if reverse {
+				return !cmp
+			}
+			return cmp
+		})
+
+		for i := range list {
+			entries[i] = list[i].entry
 		}
 	}
 }

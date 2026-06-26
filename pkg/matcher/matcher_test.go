@@ -91,3 +91,24 @@ func TestFixedMatcherCaseInsensitive(t *testing.T) {
 		t.Errorf("expected spans %v, got %v", expectedSpans, spans)
 	}
 }
+
+func BenchmarkFixedMatcherCaseInsensitive(b *testing.B) {
+	m := NewFixedMatcher("ERROR", true)
+	line := []byte("2026-06-26 12:34:56 [INFO] this is a line with no matches, but it has some characters")
+	matchLine := []byte("2026-06-26 12:34:56 [ERROR] database connection failed, retrying...")
+
+	b.Run("NoMatch", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			_ = m.Match(line)
+		}
+	})
+
+	b.Run("Match", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			_ = m.Match(matchLine)
+		}
+	})
+}
+

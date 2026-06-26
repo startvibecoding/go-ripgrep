@@ -286,6 +286,6 @@ This ensures immediate termination when the context is cancelled.
 
 ### Trade-offs
 
-- No SIMD optimization (Go doesn't expose SIMD easily)
-- No PCRE2 support (Go uses RE2 syntax)
-- Potentially slower on very large codebases compared to ripgrep
+- **SIMD optimization**: Go Assembly is planned for platform-specific SIMD optimization (see [Alignment Roadmap](alignment-roadmap.md) for details).
+- **No PCRE2 support**: Go uses RE2 syntax; PCRE2 features (lookarounds, backreferences) are omitted as they require linking to C libraries (CGO).
+- **Performance**: While currently slower on extremely large codebases, ongoing SIMD and walking optimizations aim to bridge the performance gap significantly.

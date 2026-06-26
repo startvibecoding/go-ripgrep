@@ -44,6 +44,8 @@ declare -A PLATFORMS=(
   ["darwin-arm64"]="rg-darwin-arm64"
   ["win32-x64"]="rg-windows-amd64.exe"
   ["win32-arm64"]="rg-windows-arm64.exe"
+  ["freebsd-x64"]="rg-freebsd-amd64"
+  ["freebsd-arm64"]="rg-freebsd-arm64"
 )
 
 declare -A OS_MAP=(
@@ -55,6 +57,8 @@ declare -A OS_MAP=(
   ["darwin-arm64"]="darwin"
   ["win32-x64"]="win32"
   ["win32-arm64"]="win32"
+  ["freebsd-x64"]="freebsd"
+  ["freebsd-arm64"]="freebsd"
 )
 
 declare -A CPU_MAP=(
@@ -66,6 +70,8 @@ declare -A CPU_MAP=(
   ["darwin-arm64"]="arm64"
   ["win32-x64"]="x64"
   ["win32-arm64"]="arm64"
+  ["freebsd-x64"]="x64"
+  ["freebsd-arm64"]="arm64"
 )
 
 BUILT=0
@@ -97,13 +103,12 @@ for PLATFORM_KEY in "${!PLATFORMS[@]}"; do
   chmod +x "$PKG_DIR/bin/$INNER_BINARY" 2>/dev/null || true
 
   # Create package.json
-  # For musl packages, set libc="musl" so npm can distinguish from glibc
   if echo "$PLATFORM_KEY" | grep -q "musl"; then
     cat > "$PKG_DIR/package.json" <<EOF
 {
   "name": "$PKG_NAME",
   "version": "$VERSION",
-  "description": "go-ripgrep native binary for ${OS}-${CPU} (musl static)",
+  "description": "Pure Go ripgrep native binary for ${OS}-${CPU} (musl static)",
   "os": ["$OS"],
   "cpu": ["$CPU"],
   "libc": ["musl"],
@@ -121,7 +126,7 @@ EOF
 {
   "name": "$PKG_NAME",
   "version": "$VERSION",
-  "description": "go-ripgrep native binary for ${OS}-${CPU}",
+  "description": "Pure Go ripgrep native binary for ${OS}-${CPU}",
   "os": ["$OS"],
   "cpu": ["$CPU"],
   "libc": ["glibc"],
@@ -139,7 +144,7 @@ EOF
 {
   "name": "$PKG_NAME",
   "version": "$VERSION",
-  "description": "go-ripgrep native binary for ${OS}-${CPU}",
+  "description": "Pure Go ripgrep native binary for ${OS}-${CPU}",
   "os": ["$OS"],
   "cpu": ["$CPU"],
   "files": ["bin/"],
@@ -177,3 +182,12 @@ console.log('Updated main package.json optionalDependencies');
 
 echo ""
 echo "Built $BUILT platform packages in $PACKAGES_DIR"
+echo ""
+echo "Package sizes:"
+for d in "$PACKAGES_DIR"/*/; do
+  if [ -d "$d" ]; then
+    name=$(basename "$d")
+    size=$(du -sh "$d" | cut -f1)
+    echo "  $name: $size"
+  fi
+done

@@ -18,6 +18,8 @@ const PLATFORM_MAP = {
   'darwin-arm64': 'go-ripgrep-darwin-arm64',
   'win32-x64': 'go-ripgrep-win32-x64',
   'win32-arm64': 'go-ripgrep-win32-arm64',
+  'freebsd-x64': 'go-ripgrep-freebsd-x64',
+  'freebsd-arm64': 'go-ripgrep-freebsd-arm64',
 };
 
 function detectPlatform() {
@@ -28,9 +30,7 @@ function detectPlatform() {
     // Detect libc: musl or glibc
     const isMusl = (() => {
       try {
-        // Check for Alpine's musl
         if (fs.existsSync('/etc/alpine-release')) return true;
-        // Check ldd output for musl
         const { execSync } = require('child_process');
         const output = execSync('ldd --version 2>&1 || true', { encoding: 'utf8' });
         return output.includes('musl');
@@ -65,11 +65,9 @@ function findBinary() {
   try {
     addSearchDir(path.dirname(require.resolve(`${packageName}/package.json`)));
   } catch {
-    // Keep explicit fallbacks below for unusual npm layouts.
+    // Fallbacks
   }
 
-  // npm usually installs dependencies under this package. Some global installs
-  // or package managers may hoist them as siblings, so check both layouts.
   addSearchDir(path.join(__dirname, '..', 'node_modules', packageName));
   addSearchDir(path.join(__dirname, '..', '..', packageName));
 
@@ -98,9 +96,6 @@ function findBinary() {
   console.error(`Could not find go-ripgrep binary for platform: ${detectPlatform()}`);
   console.error(`Searched for package: ${packageName}`);
   console.error(`Searched in: ${searchDirs.join(', ')}`);
-  console.error('');
-  console.error('If you installed globally, try reinstalling:');
-  console.error('  npm install -g go-ripgrep');
   process.exit(1);
 }
 
@@ -111,12 +106,8 @@ const args = process.argv.slice(2);
 try {
   execFileSync(binaryPath, args, { stdio: 'inherit' });
 } catch (err) {
-  // Forward the exit code
   if (err.status !== undefined) {
     process.exit(err.status);
-  }
-  if (err.code) {
-    process.exit(1);
   }
   process.exit(1);
 }

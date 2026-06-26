@@ -18,7 +18,7 @@ func TestParseArgsOverrides(t *testing.T) {
 				Pattern:         "pattern",
 				Color:           "auto",
 				CaseInsensitive: false,
-				LineNumber:      true,
+				LineNumber:      false,
 			},
 		},
 		{
@@ -28,7 +28,7 @@ func TestParseArgsOverrides(t *testing.T) {
 				Pattern:         "pattern",
 				Color:           "auto",
 				CaseInsensitive: true,
-				LineNumber:      true,
+				LineNumber:      false,
 			},
 		},
 		{
@@ -59,7 +59,7 @@ func TestParseArgsOverrides(t *testing.T) {
 				Color:        "auto",
 				WithFilename: false,
 				NoFilename:   true,
-				LineNumber:   true,
+				LineNumber:   false,
 			},
 		},
 		{
@@ -70,7 +70,7 @@ func TestParseArgsOverrides(t *testing.T) {
 				Color:        "auto",
 				WithFilename: true,
 				NoFilename:   false,
-				LineNumber:   true,
+				LineNumber:   false,
 			},
 		},
 		{
@@ -81,7 +81,7 @@ func TestParseArgsOverrides(t *testing.T) {
 				Color:         "auto",
 				BeforeContext: 3,
 				AfterContext:  3,
-				LineNumber:    true,
+				LineNumber:    false,
 			},
 		},
 		{
@@ -92,7 +92,7 @@ func TestParseArgsOverrides(t *testing.T) {
 				Color:         "auto",
 				BeforeContext: 3,
 				AfterContext:  1,
-				LineNumber:    true,
+				LineNumber:    false,
 			},
 		},
 		{
@@ -105,7 +105,7 @@ func TestParseArgsOverrides(t *testing.T) {
 				CaseInsensitive: true,
 				WordRegexp:      true,
 				FixedStrings:    true,
-				LineNumber:      true,
+				LineNumber:      false,
 			},
 		},
 		{
@@ -115,7 +115,7 @@ func TestParseArgsOverrides(t *testing.T) {
 				Pattern:    "pattern",
 				Color:      "auto",
 				Globs:      []string{"*.log", "!error.log"},
-				LineNumber: true,
+				LineNumber: false,
 			},
 		},
 		{
@@ -125,7 +125,7 @@ func TestParseArgsOverrides(t *testing.T) {
 				Pattern:      "pattern",
 				Color:        "auto",
 				OnlyMatching: true,
-				LineNumber:   true,
+				LineNumber:   false,
 			},
 		},
 		{
@@ -135,7 +135,7 @@ func TestParseArgsOverrides(t *testing.T) {
 				Pattern:    "pattern",
 				Color:      "auto",
 				Count:      true,
-				LineNumber: true,
+				LineNumber: false,
 			},
 		},
 		{
@@ -145,7 +145,7 @@ func TestParseArgsOverrides(t *testing.T) {
 				Pattern:    "pattern",
 				Color:      "auto",
 				Quiet:      true,
-				LineNumber: true,
+				LineNumber: false,
 			},
 		},
 	}

@@ -14,6 +14,7 @@ npm/packages/
 npm/bin/
 npm/*.tgz
 package-lock.json
+/dist/
 
 # OS files
 .DS_Store

@@ -70,3 +70,52 @@ func TestIgnoreStack(t *testing.T) {
 		t.Errorf("expected %s to be ignored due to subdir .rgignore override", subdirImportantLog)
 	}
 }
+
+func TestIgnoreStackParentClimbing(t *testing.T) {
+	// Create a nested temporary directory structure
+	tmpDir, err := os.MkdirTemp("", "ignore-climb-test-")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create nested directories: tmpDir/parent/child
+	parentDir := filepath.Join(tmpDir, "parent")
+	childDir := filepath.Join(parentDir, "child")
+	if err := os.MkdirAll(childDir, 0755); err != nil {
+		t.Fatalf("failed to create childDir: %v", err)
+	}
+
+	// Write .gitignore in parentDir
+	parentGitignore := filepath.Join(parentDir, ".gitignore")
+	if err := os.WriteFile(parentGitignore, []byte("*.tmp\n"), 0644); err != nil {
+		t.Fatalf("failed to write parent .gitignore: %v", err)
+	}
+
+	// Write .ignore in childDir
+	childIgnore := filepath.Join(childDir, ".ignore")
+	if err := os.WriteFile(childIgnore, []byte("!special.tmp\n"), 0644); err != nil {
+		t.Fatalf("failed to write child .ignore: %v", err)
+	}
+
+	// Setup stack with LoadBaseRules starting from childDir
+	stack := NewIgnoreStack(false, false, 0)
+	stack.LoadBaseRules(childDir)
+
+	// We also manually push childDir to simulate the walker's push on the search target
+	if err := stack.Push(childDir); err != nil {
+		t.Fatalf("failed to push childDir: %v", err)
+	}
+
+	// Check if a .tmp file in childDir is ignored due to parent's .gitignore
+	testTmp := filepath.Join(childDir, "test.tmp")
+	if !stack.IsIgnored(testTmp, false) {
+		t.Errorf("expected %s to be ignored due to parent's .gitignore", testTmp)
+	}
+
+	// Check if special.tmp is NOT ignored due to child's .ignore negation
+	specialTmp := filepath.Join(childDir, "special.tmp")
+	if stack.IsIgnored(specialTmp, false) {
+		t.Errorf("expected %s NOT to be ignored due to child's .ignore negation", specialTmp)
+	}
+}

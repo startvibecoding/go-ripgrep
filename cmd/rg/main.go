@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"go-ripgrep"
+	"go-ripgrep/pkg/ignore"
 	"go-ripgrep/pkg/matcher"
 	"go-ripgrep/pkg/printer"
 	"go-ripgrep/pkg/searcher"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +30,10 @@ type CliArgs struct {
 	FollowSymlinks bool
 	MaxDepth       int
 	Globs          []string
+	Types          []string
+	TypesNot       []string
+	TypeList       bool
+	SearchZip      bool
 
 	BeforeContext int
 	AfterContext  int
@@ -46,12 +52,16 @@ type CliArgs struct {
 	OnlyMatching bool
 	Count        bool
 	Quiet        bool
+	SortBy       string // "path", "modified", "size", or "none"
+	SortReverse  bool   // reverse sorting order
+	Replace      string
+	HasReplace   bool
 
 	Help    bool
 	Version bool
 }
 
-const version = "15.1.0-go"
+const version = "0.0.1"
 
 const helpMessage = `go-ripgrep (rg) recursively searches your directory for a regex pattern.
 
@@ -109,6 +119,18 @@ func main() {
 		os.Exit(0)
 	}
 
+	if cli.TypeList {
+		var keys []string
+		for k := range ignore.BuiltInTypes {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Printf("%s: %s\n", k, strings.Join(ignore.BuiltInTypes[k], ", "))
+		}
+		os.Exit(0)
+	}
+
 	if cli.Pattern == "" {
 		fmt.Fprintln(os.Stderr, "error: PATTERN is required. See 'rg --help'.")
 		os.Exit(2)
@@ -139,6 +161,17 @@ func main() {
 		colorEnabled = printer.IsTerminal() && !cli.JSON
 	}
 
+	// Configure line numbers
+	lineNumbersEnabled := false
+	if cli.LineNumber {
+		lineNumbersEnabled = true
+	} else if cli.NoLineNumber {
+		lineNumbersEnabled = false
+	} else {
+		// Default: on if stdout is terminal, off otherwise
+		lineNumbersEnabled = printer.IsTerminal()
+	}
+
 	if searchStdin {
 		m, err := matcher.BuildMatcher(cli.Pattern, cli.FixedStrings, cli.CaseInsensitive, cli.WordRegexp)
 		if err != nil {
@@ -146,6 +179,9 @@ func main() {
 			os.Exit(2)
 		}
 		s := searcher.NewSearcher(m, cli.BeforeContext, cli.AfterContext, cli.MaxCount, cli.InvertMatch)
+		if cli.HasReplace {
+			s.SetReplace(cli.Replace)
+		}
 		res, err := s.SearchReader(os.Stdin, "<stdin>")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -155,7 +191,7 @@ func main() {
 		pConfig := printer.Config{
 			Group:         false,
 			Color:         colorEnabled,
-			WithLineNum:   !cli.NoLineNumber,
+			WithLineNum:   lineNumbersEnabled,
 			WithFilename:  cli.WithFilename && !cli.NoFilename,
 			WithColumnNum: cli.Column,
 			JSON:          cli.JSON,
@@ -172,6 +208,8 @@ func main() {
 
 	// Directory / Multi-file search
 	opts := goriggrep.Options{
+		Replace:         cli.Replace,
+		HasReplace:      cli.HasReplace,
 		Pattern:         cli.Pattern,
 		IsFixed:         cli.FixedStrings,
 		CaseInsensitive: cli.CaseInsensitive,
@@ -183,6 +221,11 @@ func main() {
 		FollowSymlinks: cli.FollowSymlinks,
 		MaxDepth:       cli.MaxDepth,
 		Globs:          cli.Globs,
+		Types:          cli.Types,
+		TypesNot:       cli.TypesNot,
+		SearchZip:      cli.SearchZip,
+		SortBy:          cli.SortBy,
+		SortReverse:     cli.SortReverse,
 
 		BeforeContext: cli.BeforeContext,
 		AfterContext:  cli.AfterContext,
@@ -230,7 +273,7 @@ func main() {
 	pConfig := printer.Config{
 		Group:         group,
 		Color:         colorEnabled,
-		WithLineNum:   !cli.NoLineNumber,
+		WithLineNum:   lineNumbersEnabled,
 		WithFilename:  withFilename,
 		WithColumnNum: cli.Column,
 		JSON:          cli.JSON,
@@ -267,8 +310,7 @@ func main() {
 
 func parseArgs(args []string) (*CliArgs, error) {
 	cli := &CliArgs{
-		Color:      "auto",
-		LineNumber: true,
+		Color: "auto",
 	}
 
 	n := len(args)
@@ -306,6 +348,8 @@ func parseArgs(args []string) (*CliArgs, error) {
 				cli.InvertMatch = true
 			case "hidden":
 				cli.Hidden = true
+			case "search-zip":
+				cli.SearchZip = true
 			case "no-ignore":
 				cli.NoIgnore = true
 			case "follow":
@@ -318,6 +362,60 @@ func parseArgs(args []string) (*CliArgs, error) {
 				cli.Count = true
 			case "quiet":
 				cli.Quiet = true
+			case "replace":
+				if !hasValue {
+					if i+1 < n {
+						value = args[i+1]
+						i++
+					} else {
+						return nil, fmt.Errorf("error: --replace requires a value")
+					}
+				}
+				cli.Replace = value
+				cli.HasReplace = true
+			case "type":
+				if !hasValue {
+					if i+1 < n {
+						value = args[i+1]
+						i++
+					} else {
+						return nil, fmt.Errorf("error: --type requires a value")
+					}
+				}
+				cli.Types = append(cli.Types, value)
+			case "type-not":
+				if !hasValue {
+					if i+1 < n {
+						value = args[i+1]
+						i++
+					} else {
+						return nil, fmt.Errorf("error: --type-not requires a value")
+					}
+				}
+				cli.TypesNot = append(cli.TypesNot, value)
+			case "type-list":
+				cli.TypeList = true
+			case "sort":
+				if !hasValue {
+					if i+1 < n {
+						value = args[i+1]
+						i++
+					} else {
+						return nil, fmt.Errorf("error: --sort requires a value")
+					}
+				}
+				cli.SortBy = value
+			case "sortr":
+				if !hasValue {
+					if i+1 < n {
+						value = args[i+1]
+						i++
+					} else {
+						return nil, fmt.Errorf("error: --sortr requires a value")
+					}
+				}
+				cli.SortBy = value
+				cli.SortReverse = true
 			case "column":
 				cli.Column = true
 			case "heading":
@@ -468,6 +566,45 @@ func parseArgs(args []string) (*CliArgs, error) {
 					cli.Count = true
 				case 'q':
 					cli.Quiet = true
+				case 'z':
+					cli.SearchZip = true
+				case 'r':
+					val := ""
+					if j+1 < len(runes) {
+						val = string(runes[j+1:])
+						j = len(runes) // consume the rest
+					} else if i+1 < n {
+						val = args[i+1]
+						i++
+					} else {
+						return nil, fmt.Errorf("error: -r requires a value")
+					}
+					cli.Replace = val
+					cli.HasReplace = true
+				case 't':
+					val := ""
+					if j+1 < len(runes) {
+						val = string(runes[j+1:])
+						j = len(runes) // consume the rest
+					} else if i+1 < n {
+						val = args[i+1]
+						i++
+					} else {
+						return nil, fmt.Errorf("error: -t requires a value")
+					}
+					cli.Types = append(cli.Types, val)
+				case 'T':
+					val := ""
+					if j+1 < len(runes) {
+						val = string(runes[j+1:])
+						j = len(runes) // consume the rest
+					} else if i+1 < n {
+						val = args[i+1]
+						i++
+					} else {
+						return nil, fmt.Errorf("error: -T requires a value")
+					}
+					cli.TypesNot = append(cli.TypesNot, val)
 				case 'n':
 					cli.LineNumber = true
 					cli.NoLineNumber = false

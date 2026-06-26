@@ -15,7 +15,7 @@ if [ -n "$1" ]; then
 else
   VERSION=$(git describe --tags --always 2>/dev/null)
   if [ -z "$VERSION" ]; then
-    VERSION="15.1.0-go"
+    VERSION="0.0.1"
   fi
 fi
 VERSION="${VERSION#v}"
@@ -28,15 +28,19 @@ echo "Syncing npm version to: $VERSION"
 node -e "
 const fs = require('fs');
 const pkgPath = '$PACKAGE_JSON';
-const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-pkg.version = '$VERSION';
-if (pkg.optionalDependencies) {
-  for (const key of Object.keys(pkg.optionalDependencies)) {
-    pkg.optionalDependencies[key] = '$VERSION';
+if (fs.existsSync(pkgPath)) {
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  pkg.version = '$VERSION';
+  if (pkg.optionalDependencies) {
+    for (const key of Object.keys(pkg.optionalDependencies)) {
+      pkg.optionalDependencies[key] = '$VERSION';
+    }
   }
+  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+  console.log('Updated: $PACKAGE_JSON');
+} else {
+  console.log('Main package.json not found, skipping sync');
 }
-fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-console.log('Updated: $PACKAGE_JSON');
 "
 
 # Update all platform package.json files

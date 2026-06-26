@@ -1,12 +1,17 @@
 package searcher
 
 import (
+	"archive/zip"
 	"bufio"
 	"bytes"
+	"compress/bzip2"
+	"compress/gzip"
 	"go-ripgrep/pkg/matcher"
 	"go-ripgrep/pkg/printer"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 // Searcher performs line-by-line searching of a single file/reader.
@@ -16,6 +21,10 @@ type Searcher struct {
 	afterContext  int
 	maxCount      int
 	invertMatch   bool
+
+	replace    string
+	hasReplace bool
+	searchZip  bool
 }
 
 // NewSearcher creates a Searcher configured with the given options.
@@ -27,6 +36,15 @@ func NewSearcher(m matcher.Matcher, beforeContext, afterContext, maxCount int, i
 		maxCount:      maxCount,
 		invertMatch:   invertMatch,
 	}
+}
+
+func (s *Searcher) SetReplace(replace string) {
+	s.replace = replace
+	s.hasReplace = true
+}
+
+func (s *Searcher) SetSearchZip(active bool) {
+	s.searchZip = active
 }
 
 type bufferedLine struct {
@@ -102,14 +120,78 @@ func (s *Searcher) SearchReader(r io.Reader, path string) (*printer.FileResult, 
 	}, nil
 }
 
-// SearchFile opens a file and searches it.
-func (s *Searcher) SearchFile(path string) (*printer.FileResult, error) {
+// SearchFile opens a file and searches it, potentially decompressing or unpacking it.
+func (s *Searcher) SearchFile(path string) ([]*printer.FileResult, error) {
+	if s.searchZip {
+		ext := strings.ToLower(filepath.Ext(path))
+		switch ext {
+		case ".gz":
+			f, err := os.Open(path)
+			if err != nil {
+				return nil, err
+			}
+			defer f.Close()
+			gr, err := gzip.NewReader(f)
+			if err != nil {
+				return nil, err
+			}
+			defer gr.Close()
+			res, err := s.SearchReader(gr, path)
+			if err != nil {
+				return nil, err
+			}
+			return []*printer.FileResult{res}, nil
+
+		case ".bz2":
+			f, err := os.Open(path)
+			if err != nil {
+				return nil, err
+			}
+			defer f.Close()
+			br := bzip2.NewReader(f)
+			res, err := s.SearchReader(br, path)
+			if err != nil {
+				return nil, err
+			}
+			return []*printer.FileResult{res}, nil
+
+		case ".zip":
+			zr, err := zip.OpenReader(path)
+			if err != nil {
+				return nil, err
+			}
+			defer zr.Close()
+
+			var results []*printer.FileResult
+			for _, file := range zr.File {
+				if file.FileInfo().IsDir() {
+					continue
+				}
+				rc, err := file.Open()
+				if err != nil {
+					continue
+				}
+				innerPath := path + "//" + file.Name
+				res, err := s.SearchReader(rc, innerPath)
+				rc.Close()
+				if err == nil && res != nil {
+					results = append(results, res)
+				}
+			}
+			return results, nil
+		}
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	return s.SearchReader(f, path)
+	res, err := s.SearchReader(f, path)
+	if err != nil {
+		return nil, err
+	}
+	return []*printer.FileResult{res}, nil
 }
 
 func (s *Searcher) processLine(
@@ -151,16 +233,29 @@ func (s *Searcher) processLine(
 			*beforeBuf = (*beforeBuf)[:0] // clear before context
 		}
 
-		// 2. Compile submatches
+		// 2. Compile submatches and perform replacement if needed
 		var subs []printer.Submatch
 		if !s.invertMatch {
-			spans := s.m.FindSpans(trimmedLineBytes)
-			subs = make([]printer.Submatch, len(spans))
-			for i, span := range spans {
-				subs[i] = printer.Submatch{
-					Start: span[0],
-					End:   span[1],
-					Text:  string(trimmedLineBytes[span[0]:span[1]]),
+			if s.hasReplace {
+				replacedBytes, newSpans := s.m.Replace(trimmedLineBytes, []byte(s.replace))
+				lineStr = string(replacedBytes)
+				subs = make([]printer.Submatch, len(newSpans))
+				for i, span := range newSpans {
+					subs[i] = printer.Submatch{
+						Start: span[0],
+						End:   span[1],
+						Text:  string(replacedBytes[span[0]:span[1]]),
+					}
+				}
+			} else {
+				spans := s.m.FindSpans(trimmedLineBytes)
+				subs = make([]printer.Submatch, len(spans))
+				for i, span := range spans {
+					subs[i] = printer.Submatch{
+						Start: span[0],
+						End:   span[1],
+						Text:  string(trimmedLineBytes[span[0]:span[1]]),
+					}
 				}
 			}
 		}
