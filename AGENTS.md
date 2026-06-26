@@ -7,6 +7,7 @@ Guidance for AI coding agents working in this repository. Read this before explo
 - **What it is:** `go-ripgrep` — a pure-Go port of [ripgrep](https://github.com/BurntSushi/ripgrep). It ships both a CLI tool (`rg`) that mirrors ripgrep's interface and an embeddable Go SDK.
 - **Language:** Go (module requires Go **1.26+**, see `go.mod`).
 - **Dependencies:** Standard library plus `golang.org/x/sys` for CPU feature detection. Keep dependencies limited to this unless there's a strong reason.
+- **Vendoring:** All dependencies are vendored in `vendor/` to avoid supply chain attacks. Always build and test with `-mod=vendor` (enforced in `Makefile`). When adding/updating deps, run `go mod vendor` and commit the `vendor/` directory.
 - **Distribution:** Single static binary; cross-compiled for Linux (amd64/arm64/loong64), macOS (amd64/arm64), Windows (amd64/arm64); also published as npm packages.
 - **License:** MIT.
 
@@ -67,3 +68,4 @@ npm packaging: `make npm-version`, `make npm-packages`, `make npm-pack`, `make n
 - Don't commit build artifacts (`bin/`, `npm/packages/`, `*.tgz`).
 - Don't publish npm packages (`make npm-publish-all`) or bump versions unless explicitly asked.
 - Don't break ripgrep CLI flag compatibility or the NDJSON output format.
+- Don't remove the `vendor/` directory or `-mod=vendor` build flag; vendoring protects against supply chain attacks.

@@ -2,6 +2,7 @@ package searcher
 
 import (
 	"bytes"
+	"context"
 	"github.com/startvibecoding/go-ripgrep/pkg/matcher"
 	"testing"
 )
@@ -88,5 +89,22 @@ func TestSearcherInvertMatch(t *testing.T) {
 
 	if res.Stats.Matches != 2 {
 		t.Errorf("expected 2 matches, got %d", res.Stats.Matches)
+	}
+}
+
+func TestSearcherCancellation(t *testing.T) {
+	m, err := matcher.BuildMatcher("world", true, false, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	s := NewSearcher(m, 0, 0, 0, false)
+	s.SetContext(ctx)
+
+	if _, err := s.SearchReader(bytes.NewReader([]byte("hello\nworld\n")), "test.txt"); err == nil {
+		t.Fatal("expected cancellation error, got nil")
 	}
 }

@@ -207,10 +207,11 @@ func NewSearcher(m matcher.Matcher, beforeContext, afterContext, maxCount int, i
 ### SearchFile
 
 ```go
-func (s *Searcher) SearchFile(path string) (*printer.FileResult, error)
+func (s *Searcher) SearchFile(path string) ([]*printer.FileResult, error)
 ```
 
-Opens and searches a file. Returns the search result.
+Opens and searches a file. Returns one result for normal files and potentially multiple
+results when archive search is enabled and the file expands into multiple logical entries.
 
 ### SearchReader
 

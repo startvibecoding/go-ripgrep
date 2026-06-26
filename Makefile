@@ -9,7 +9,7 @@ BINARY_NAME=rg
 PACKAGE_NAME=go-ripgrep
 VERSION=$(shell git describe --tags --abbrev=0 2>/dev/null || echo "0.0.1")
 LDFLAGS=-ldflags "-s -w -X main.version=$(VERSION)"
-GOBUILD_FLAGS=-trimpath
+GOBUILD_FLAGS=-trimpath -mod=vendor
 DIST_DIR=dist
 CHECKSUM_FILE=$(DIST_DIR)/checksums.txt
 
@@ -116,11 +116,11 @@ build-all: build-linux build-linux-musl build-darwin build-windows build-freebsd
 
 # Install
 install:
-	go install $(GOBUILD_FLAGS) $(LDFLAGS) ./cmd/rg
+	go install -mod=vendor $(GOBUILD_FLAGS) $(LDFLAGS) ./cmd/rg
 
 # Test
 test:
-	go test -v -race ./...
+	go test -v -race -mod=vendor ./...
 
 # Format
 fmt:

@@ -4,9 +4,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestSDKSearch(t *testing.T) {
@@ -111,5 +113,114 @@ func BenchmarkSearch(b *testing.B) {
 		}
 		for range resultsChan {
 		}
+	}
+}
+
+func TestSDKSearchPositiveGlobTraversesDirectories(t *testing.T) {
+	tmpDir := t.TempDir()
+	nestedDir := filepath.Join(tmpDir, "nested")
+	if err := os.MkdirAll(nestedDir, 0755); err != nil {
+		t.Fatalf("failed to create nested dir: %v", err)
+	}
+
+	targetFile := filepath.Join(nestedDir, "main.go")
+	if err := os.WriteFile(targetFile, []byte("package main\n// TODO: fix me\n"), 0644); err != nil {
+		t.Fatalf("failed to write target file: %v", err)
+	}
+
+	resultsChan, err := Search(context.Background(), []string{tmpDir}, Options{
+		Pattern: "TODO",
+		Globs:   []string{"*.go"},
+	})
+	if err != nil {
+		t.Fatalf("search failed to initialize: %v", err)
+	}
+
+	var paths []string
+	for res := range resultsChan {
+		paths = append(paths, res.Path)
+	}
+
+	if !reflect.DeepEqual(paths, []string{targetFile}) {
+		t.Fatalf("expected only %q, got %v", targetFile, paths)
+	}
+}
+
+func TestSDKSearchExplicitFileRespectsTypeFilters(t *testing.T) {
+	tmpDir := t.TempDir()
+	textFile := filepath.Join(tmpDir, "notes.txt")
+	if err := os.WriteFile(textFile, []byte("needle\n"), 0644); err != nil {
+		t.Fatalf("failed to write text file: %v", err)
+	}
+
+	resultsChan, err := Search(context.Background(), []string{textFile}, Options{
+		Pattern: "needle",
+		Types:   []string{"go"},
+	})
+	if err != nil {
+		t.Fatalf("search failed to initialize: %v", err)
+	}
+
+	for res := range resultsChan {
+		t.Fatalf("expected no results, got %+v", res)
+	}
+}
+
+func TestSortDirEntriesReversePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	for _, name := range []string{"alpha.txt", "beta.txt", "gamma.txt"} {
+		if err := os.WriteFile(filepath.Join(tmpDir, name), []byte(name), 0644); err != nil {
+			t.Fatalf("failed to write %s: %v", name, err)
+		}
+	}
+
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to read dir: %v", err)
+	}
+
+	sortDirEntries(tmpDir, entries, "path", true)
+
+	var names []string
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+
+	expected := []string{"gamma.txt", "beta.txt", "alpha.txt"}
+	if !reflect.DeepEqual(names, expected) {
+		t.Fatalf("expected %v, got %v", expected, names)
+	}
+}
+
+func TestSDKSearchCancellationStopsWork(t *testing.T) {
+	tmpDir := t.TempDir()
+	largeFile := filepath.Join(tmpDir, "large.txt")
+	content := strings.Repeat("line without match\n", 200000)
+	if err := os.WriteFile(largeFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write large file: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	resultsChan, err := Search(ctx, []string{largeFile}, Options{
+		Pattern: "never-matches",
+		Threads: 1,
+	})
+	if err != nil {
+		t.Fatalf("search failed to initialize: %v", err)
+	}
+
+	cancel()
+
+	done := make(chan struct{})
+	go func() {
+		for range resultsChan {
+		}
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("search did not stop promptly after cancellation")
 	}
 }

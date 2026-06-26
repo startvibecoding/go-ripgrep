@@ -89,6 +89,7 @@ func Search(ctx context.Context, paths []string, opts Options) (<-chan printer.F
 		go func() {
 			defer wg.Done()
 			s := searcher.NewSearcher(m, opts.BeforeContext, opts.AfterContext, opts.MaxCount, opts.InvertMatch)
+			s.SetContext(ctx)
 			if opts.HasReplace {
 				s.SetReplace(opts.Replace)
 			}
@@ -163,6 +164,9 @@ func Search(ctx context.Context, paths []string, opts Options) (<-chan printer.F
 
 			// If explicitly passed file, we bypass the walk ignore stack but still respect global -g glob filters
 			if !isDir {
+				if ignore.ShouldIgnoreByType(filepath.Base(path), opts.Types, opts.TypesNot) {
+					continue
+				}
 				if globSet != nil {
 					if globSet.MatchGlobFilter(path) {
 						continue
@@ -251,7 +255,11 @@ func walkDir(
 
 		// 2. Check -g/--glob option filters if active
 		if globSet != nil {
-			if globSet.MatchGlobFilter(path) {
+			shouldSkip := globSet.MatchGlobFilter(path)
+			if isDir {
+				shouldSkip = globSet.MatchGlobFilterDir(path)
+			}
+			if shouldSkip {
 				continue
 			}
 		}
@@ -281,11 +289,10 @@ func sortDirEntries(dirPath string, entries []os.DirEntry, sortBy string, revers
 	switch sortBy {
 	case "path":
 		sort.Slice(entries, func(i, j int) bool {
-			cmp := strings.Compare(entries[i].Name(), entries[j].Name()) < 0
 			if reverse {
-				return !cmp
+				return strings.Compare(entries[i].Name(), entries[j].Name()) > 0
 			}
-			return cmp
+			return strings.Compare(entries[i].Name(), entries[j].Name()) < 0
 		})
 	case "modified", "size":
 		type entryWithInfo struct {
@@ -302,25 +309,39 @@ func sortDirEntries(dirPath string, entries []os.DirEntry, sortBy string, revers
 		}
 
 		sort.Slice(list, func(i, j int) bool {
-			var cmp bool
 			infoI, infoJ := list[i].info, list[j].info
+			var cmp int
 			if infoI == nil && infoJ == nil {
-				cmp = list[i].entry.Name() < list[j].entry.Name()
+				cmp = strings.Compare(list[i].entry.Name(), list[j].entry.Name())
 			} else if infoI == nil {
-				cmp = false
+				cmp = 1
 			} else if infoJ == nil {
-				cmp = true
+				cmp = -1
 			} else {
 				if sortBy == "modified" {
-					cmp = infoI.ModTime().Before(infoJ.ModTime())
+					switch {
+					case infoI.ModTime().Before(infoJ.ModTime()):
+						cmp = -1
+					case infoI.ModTime().After(infoJ.ModTime()):
+						cmp = 1
+					default:
+						cmp = strings.Compare(list[i].entry.Name(), list[j].entry.Name())
+					}
 				} else { // "size"
-					cmp = infoI.Size() < infoJ.Size()
+					switch {
+					case infoI.Size() < infoJ.Size():
+						cmp = -1
+					case infoI.Size() > infoJ.Size():
+						cmp = 1
+					default:
+						cmp = strings.Compare(list[i].entry.Name(), list[j].entry.Name())
+					}
 				}
 			}
 			if reverse {
-				return !cmp
+				return cmp > 0
 			}
-			return cmp
+			return cmp < 0
 		})
 
 		for i := range list {

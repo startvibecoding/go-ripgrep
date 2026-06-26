@@ -36,6 +36,12 @@ make build
 go install github.com/startvibecoding/go-ripgrep/cmd/rg@latest
 ```
 
+### 作为 Go SDK 引入
+
+```bash
+go get github.com/startvibecoding/go-ripgrep
+```
+
 ### 通过 npm
 
 ```bash
@@ -105,43 +111,65 @@ rg --no-ignore "node_modules" .
 
 ### Go SDK
 
+根包导入后建议使用别名 `goriggrep`：
+
 ```go
 package main
 
 import (
-    "context"
-    "fmt"
-    goriggrep "github.com/startvibecoding/go-ripgrep"
-    "github.com/startvibecoding/go-ripgrep/pkg/printer"
+	"context"
+	"fmt"
+
+	goriggrep "github.com/startvibecoding/go-ripgrep"
 )
 
 func main() {
-    opts := goriggrep.Options{
-        Pattern:         "TODO",
-        CaseInsensitive: true,
-        // MaxDepth:       3,
-        // Globs:          []string{"*.go", "!vendor/"},
-        // Threads:        8,
-    }
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-    ctx, cancel := context.WithCancel(context.Background())
-    defer cancel()
+	results, err := goriggrep.Search(ctx, []string{"./src"}, goriggrep.Options{
+		Pattern:         "TODO",
+		CaseInsensitive: true,
+		Globs:           []string{"*.go", "!vendor/**"},
+		BeforeContext:   1,
+		AfterContext:    1,
+		MaxCount:        10,
+		Threads:         4,
+	})
+	if err != nil {
+		panic(err)
+	}
 
-    results, err := goriggrep.Search(ctx, []string{"./src"}, opts)
-    if err != nil {
-        panic(err)
-    }
-
-    for res := range results {
-        fmt.Printf("文件: %s (%d 个匹配)\n", res.Path, res.Stats.Matches)
-        for _, m := range res.Matches {
-            if !m.IsContext {
-                fmt.Printf("  第 %d 行: %s\n", m.LineNum, m.Line)
-            }
-        }
-    }
+	for res := range results {
+		fmt.Printf("%s: %d 个匹配\n", res.Path, res.Stats.Matches)
+		for _, m := range res.Matches {
+			if m.IsContext {
+				fmt.Printf("  %d-%s\n", m.LineNum, m.Line)
+				continue
+			}
+			fmt.Printf("  %d:%s\n", m.LineNum, m.Line)
+		}
+	}
 }
 ```
+
+`Search` 会返回一个流式的 `<-chan printer.FileResult>`。每个结果包含：
+
+- `Path`：命中的文件路径，或压缩包内条目的逻辑路径
+- `Matches`：匹配行和上下文行
+- `Stats`：扫描行数和匹配数
+- `Elapsed`：该文件的搜索耗时
+
+常用 SDK 选项：
+
+- `Pattern`、`IsFixed`、`CaseInsensitive`、`WordRegexp`、`InvertMatch`
+- `Globs`、`Types`、`TypesNot`、`NoIgnore`、`Hidden`、`FollowSymlinks`
+- `BeforeContext`、`AfterContext`、`MaxCount`
+- `SearchZip`：搜索 `.zip`、`.gz`、`.bz2`
+- `SortBy` 和 `SortReverse`
+- `Threads`：控制 worker 数量
+
+可以通过 `context.Context` 提前取消搜索。完整 SDK 说明见 [docs/sdk-reference.md](docs/sdk-reference.md)。
 
 ## CLI 选项参考
 

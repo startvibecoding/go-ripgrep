@@ -249,3 +249,19 @@ func (gs *GlobSet) MatchGlobFilter(path string) bool {
 
 	return false
 }
+
+// MatchGlobFilterDir checks whether a directory should be excluded during traversal.
+// Positive globs do not exclude directories by themselves because descendants may still match.
+func (gs *GlobSet) MatchGlobFilterDir(path string) bool {
+	if len(gs.globs) == 0 {
+		return false
+	}
+
+	path = filepath.ToSlash(path)
+	for _, g := range gs.globs {
+		if g.IsNegated && g.Match(path) {
+			return true
+		}
+	}
+	return false
+}

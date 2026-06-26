@@ -36,6 +36,12 @@ make build
 go install github.com/startvibecoding/go-ripgrep/cmd/rg@latest
 ```
 
+### As a Go SDK
+
+```bash
+go get github.com/startvibecoding/go-ripgrep
+```
+
 ### Via npm
 
 ```bash
@@ -105,43 +111,65 @@ rg --no-ignore "node_modules" .
 
 ### Go SDK
 
+Use the root package as `goriggrep`:
+
 ```go
 package main
 
 import (
-    "context"
-    "fmt"
-    goriggrep "github.com/startvibecoding/go-ripgrep"
-    "github.com/startvibecoding/go-ripgrep/pkg/printer"
+	"context"
+	"fmt"
+
+	goriggrep "github.com/startvibecoding/go-ripgrep"
 )
 
 func main() {
-    opts := goriggrep.Options{
-        Pattern:         "TODO",
-        CaseInsensitive: true,
-        // MaxDepth:       3,
-        // Globs:          []string{"*.go", "!vendor/"},
-        // Threads:        8,
-    }
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-    ctx, cancel := context.WithCancel(context.Background())
-    defer cancel()
+	results, err := goriggrep.Search(ctx, []string{"./src"}, goriggrep.Options{
+		Pattern:         "TODO",
+		CaseInsensitive: true,
+		Globs:           []string{"*.go", "!vendor/**"},
+		BeforeContext:   1,
+		AfterContext:    1,
+		MaxCount:        10,
+		Threads:         4,
+	})
+	if err != nil {
+		panic(err)
+	}
 
-    results, err := goriggrep.Search(ctx, []string{"./src"}, opts)
-    if err != nil {
-        panic(err)
-    }
-
-    for res := range results {
-        fmt.Printf("File: %s (%d matches)\n", res.Path, res.Stats.Matches)
-        for _, m := range res.Matches {
-            if !m.IsContext {
-                fmt.Printf("  Line %d: %s\n", m.LineNum, m.Line)
-            }
-        }
-    }
+	for res := range results {
+		fmt.Printf("%s: %d matches\n", res.Path, res.Stats.Matches)
+		for _, m := range res.Matches {
+			if m.IsContext {
+				fmt.Printf("  %d-%s\n", m.LineNum, m.Line)
+				continue
+			}
+			fmt.Printf("  %d:%s\n", m.LineNum, m.Line)
+		}
+	}
 }
 ```
+
+`Search` returns a streaming `<-chan printer.FileResult>`. Each result includes:
+
+- `Path`: the matched file or archive entry path
+- `Matches`: matched lines and context lines
+- `Stats`: searched line count and match count
+- `Elapsed`: time spent searching that file
+
+Common SDK options:
+
+- `Pattern`, `IsFixed`, `CaseInsensitive`, `WordRegexp`, `InvertMatch`
+- `Globs`, `Types`, `TypesNot`, `NoIgnore`, `Hidden`, `FollowSymlinks`
+- `BeforeContext`, `AfterContext`, `MaxCount`
+- `SearchZip` for `.zip`, `.gz`, `.bz2`
+- `SortBy` and `SortReverse`
+- `Threads` to control worker count
+
+Use `context.Context` cancellation to stop a search early. For the full SDK surface, see [docs/sdk-reference.md](docs/sdk-reference.md).
 
 ## CLI Options Reference
 

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"compress/bzip2"
 	"compress/gzip"
+	"context"
 	"github.com/startvibecoding/go-ripgrep/pkg/matcher"
 	"github.com/startvibecoding/go-ripgrep/pkg/printer"
 	"io"
@@ -25,6 +26,7 @@ type Searcher struct {
 	replace    string
 	hasReplace bool
 	searchZip  bool
+	ctx        context.Context
 }
 
 // NewSearcher creates a Searcher configured with the given options.
@@ -47,6 +49,10 @@ func (s *Searcher) SetSearchZip(active bool) {
 	s.searchZip = active
 }
 
+func (s *Searcher) SetContext(ctx context.Context) {
+	s.ctx = ctx
+}
+
 type bufferedLine struct {
 	num  int
 	text string
@@ -54,6 +60,10 @@ type bufferedLine struct {
 
 // SearchReader searches from an io.Reader (like os.File or standard input).
 func (s *Searcher) SearchReader(r io.Reader, path string) (*printer.FileResult, error) {
+	if err := s.checkCancelled(); err != nil {
+		return nil, err
+	}
+
 	// Read a small prefix to detect if it's binary
 	br := bufio.NewReader(r)
 	prefix, err := br.Peek(1024)
@@ -81,6 +91,10 @@ func (s *Searcher) SearchReader(r io.Reader, path string) (*printer.FileResult, 
 	// Custom reader to avoid string allocations for every line
 	var lineBuf []byte
 	for {
+		if err := s.checkCancelled(); err != nil {
+			return nil, err
+		}
+
 		chunk, err := br.ReadSlice('\n')
 		if len(chunk) > 0 {
 			lineBuf = append(lineBuf, chunk...)
@@ -122,6 +136,10 @@ func (s *Searcher) SearchReader(r io.Reader, path string) (*printer.FileResult, 
 
 // SearchFile opens a file and searches it, potentially decompressing or unpacking it.
 func (s *Searcher) SearchFile(path string) ([]*printer.FileResult, error) {
+	if err := s.checkCancelled(); err != nil {
+		return nil, err
+	}
+
 	if s.searchZip {
 		ext := strings.ToLower(filepath.Ext(path))
 		switch ext {
@@ -164,6 +182,9 @@ func (s *Searcher) SearchFile(path string) ([]*printer.FileResult, error) {
 
 			var results []*printer.FileResult
 			for _, file := range zr.File {
+				if err := s.checkCancelled(); err != nil {
+					return nil, err
+				}
 				if file.FileInfo().IsDir() {
 					continue
 				}
@@ -297,5 +318,17 @@ func (s *Searcher) processLine(
 				*beforeBuf = (*beforeBuf)[1:]
 			}
 		}
+	}
+}
+
+func (s *Searcher) checkCancelled() error {
+	if s.ctx == nil {
+		return nil
+	}
+	select {
+	case <-s.ctx.Done():
+		return s.ctx.Err()
+	default:
+		return nil
 	}
 }
