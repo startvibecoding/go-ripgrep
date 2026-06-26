@@ -34,12 +34,23 @@ type Options struct {
     WordRegexp      bool     // If true, only match whole words
     InvertMatch     bool     // If true, select non-matching lines
 
+    // Replacement settings
+    Replace         string   // The replacement string (supports $1, $2 capture groups)
+    HasReplace      bool     // Must be set to true if Replace is provided
+
     // Filtering settings
     NoIgnore       bool     // If true, ignore .gitignore/.ignore/.rgignore files
     Hidden         bool     // If true, search hidden files and directories
     FollowSymlinks bool     // If true, follow symbolic links
     MaxDepth       int      // Maximum directory depth (0 = unlimited)
     Globs          []string // Glob patterns for filtering files (negated with !)
+    Types          []string // Patterns for -t/--type
+    TypesNot       []string // Patterns for -T/--type-not
+    SearchZip      bool     // Search inside compressed archives (.zip, .gz, .bz2)
+
+    // Sorting settings
+    SortBy         string   // "path", "modified", "size", or "none"
+    SortReverse    bool     // Reverse sorting order
 
     // Context settings
     BeforeContext int        // Lines to show before each match

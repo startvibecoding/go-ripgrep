@@ -284,7 +284,7 @@ make npm-publish-all
 |---------|----------------|-----------------|
 | Language | Rust | Go |
 | Regex engine | Rust `regex` crate | Go `regexp` stdlib |
-| SIMD optimization | Yes | No |
+| SIMD optimization | Yes | Yes (AVX2 for amd64, NEON for arm64) |
 | PCRE2 support | Yes | No |
 | .gitignore support | Yes | Yes |
 | JSON output | Yes | Yes |

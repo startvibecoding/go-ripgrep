@@ -111,4 +111,3 @@ func BenchmarkFixedMatcherCaseInsensitive(b *testing.B) {
 		}
 	})
 }
-

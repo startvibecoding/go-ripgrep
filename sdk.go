@@ -2,8 +2,6 @@ package goriggrep
 
 import (
 	"context"
-	"sort"
-	"strings"
 	"go-ripgrep/pkg/globset"
 	"go-ripgrep/pkg/ignore"
 	"go-ripgrep/pkg/matcher"
@@ -12,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -26,8 +26,8 @@ type Options struct {
 	InvertMatch     bool
 
 	// Replacement settings
-	Replace         string
-	HasReplace      bool
+	Replace    string
+	HasReplace bool
 
 	// Filtering settings
 	NoIgnore       bool
@@ -40,8 +40,8 @@ type Options struct {
 	SearchZip      bool     // search inside compressed files
 
 	// Sorting settings
-	SortBy         string // "path", "modified", "size", or "none"
-	SortReverse    bool   // reverse sorting order
+	SortBy      string // "path", "modified", "size", or "none"
+	SortReverse bool   // reverse sorting order
 
 	// Context settings
 	BeforeContext int
@@ -272,7 +272,6 @@ func walkDir(
 		}
 	}
 }
-
 
 func sortDirEntries(dirPath string, entries []os.DirEntry, sortBy string, reverse bool) {
 	if len(entries) <= 1 || sortBy == "" || sortBy == "none" {

@@ -224,8 +224,8 @@ func main() {
 		Types:          cli.Types,
 		TypesNot:       cli.TypesNot,
 		SearchZip:      cli.SearchZip,
-		SortBy:          cli.SortBy,
-		SortReverse:     cli.SortReverse,
+		SortBy:         cli.SortBy,
+		SortReverse:    cli.SortReverse,
 
 		BeforeContext: cli.BeforeContext,
 		AfterContext:  cli.AfterContext,

@@ -283,7 +283,7 @@ make npm-publish-all
 |------|----------------|-----------------|
 | 语言 | Rust | Go |
 | 正则引擎 | Rust `regex` crate | Go `regexp` 标准库 |
-| SIMD 优化 | 是 | 否 |
+| SIMD 优化 | 是 | 是 (amd64 使用 AVX2，arm64 使用 NEON) |
 | PCRE2 支持 | 是 | 否 |
 | .gitignore 支持 | 是 | 是 |
 | JSON 输出 | 是 | 是 |

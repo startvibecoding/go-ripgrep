@@ -73,10 +73,10 @@ type FixedMatcher struct {
 	patternStr      string
 	caseInsensitive bool
 
-	isPatASCII      bool
-	lowerFirst      byte
-	upperFirst      byte
-	lowerPattern    []byte
+	isPatASCII   bool
+	lowerFirst   byte
+	upperFirst   byte
+	lowerPattern []byte
 }
 
 func isASCII(b []byte) bool {

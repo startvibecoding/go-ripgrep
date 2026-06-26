@@ -10,8 +10,8 @@ import (
 func TestIndexByte2(t *testing.T) {
 	// Simple tests
 	tests := []struct {
-		b      []byte
-		c1, c2 byte
+		b        []byte
+		c1, c2   byte
 		expected int
 	}{
 		{[]byte("hello"), 'e', 'o', 1},

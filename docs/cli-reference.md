@@ -69,6 +69,16 @@ rg -v "TODO"      # Show all lines that don't contain "TODO"
 rg -v "^$" file   # Show all non-empty lines
 ```
 
+#### `-r, --replace REPLACE`
+
+Replace matching portions of lines with the provided replacement string. Regular expression searches support capture groups (e.g., `$1`, `$2`, etc.).
+
+```bash
+rg -r "Holmes" "Sherlock"                 # Replaces Sherlock with Holmes in matched output
+rg -r "Dr. $1" "(\w+) Watson"             # Supports regex capture groups
+rg -o -r "Mycroft" "Sherlock"              # Replaces and shows only matching portions
+```
+
 ### File Filtering Options
 
 #### `-g, --glob GLOB`
@@ -131,6 +141,65 @@ Maximum directory depth to search. `0` means only the specified paths (no recurs
 ```bash
 rg --max-depth 2 "pattern"    # Search at most 2 levels deep
 rg --max-depth 1 "pattern" .  # Only current directory, no subdirectories
+```
+
+#### `-t, --type TYPE`
+
+Only search files matching the specified type. Multiple types can be selected.
+
+```bash
+rg -t go "main"              # Only search within Go (*.go) files
+rg -t rust -t cpp "assert"   # Search only in Rust and C++ files
+```
+
+#### `-T, --type-not TYPE`
+
+Exclude files matching the specified type from the search.
+
+```bash
+rg -T python "debug"         # Search all files EXCEPT Python files
+```
+
+#### `--type-list`
+
+List all supported file type definitions and their mapped glob patterns, then exit.
+
+```bash
+rg --type-list
+```
+
+#### `-z, --search-zip`
+
+Search inside compressed files and archives (`.zip`, `.gz`, `.bz2`). This runs entirely in-memory using pure Go streams, avoiding writing temporary files to disk.
+
+```bash
+rg -z "error_log" backup.zip  # Search inside zip archive
+rg -z "pattern" logs.tar.gz   # Search inside compressed tarballs/gz files
+```
+
+### Sorting Options
+
+#### `--sort BY`
+
+Sort search results sequentially instead of concurrently. The options are:
+- `path` — Sort by file path (alphabetically)
+- `modified` — Sort by file last modification time
+- `size` — Sort by file size
+- `none` — Do not sort (default)
+
+**Note:** Specifying `--sort` forces the search to run on a single worker thread to guarantee correct order.
+
+```bash
+rg --sort path "pattern"      # Sort results alphabetically by path
+rg --sort modified "pattern"  # Sort results by modification time
+```
+
+#### `--sortr BY`
+
+Same as `--sort`, but sorts the results in reverse order.
+
+```bash
+rg --sortr size "pattern"     # Sort results by size, largest first
 ```
 
 ### Context Options
