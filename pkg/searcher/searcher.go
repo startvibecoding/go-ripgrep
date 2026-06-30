@@ -15,6 +15,12 @@ import (
 	"strings"
 )
 
+const (
+	// maxLineLength is the maximum line length (in bytes) that will be read.
+	// Lines longer than this are silently truncated to avoid unbounded memory growth.
+	maxLineLength = 10 * 1024 * 1024 // 10 MB
+)
+
 // Searcher performs line-by-line searching of a single file/reader.
 type Searcher struct {
 	m             matcher.Matcher
@@ -97,6 +103,27 @@ func (s *Searcher) SearchReader(r io.Reader, path string) (*printer.FileResult, 
 
 		chunk, err := br.ReadSlice('\n')
 		if len(chunk) > 0 {
+			if len(lineBuf)+len(chunk) > maxLineLength {
+				remaining := maxLineLength - len(lineBuf)
+				if remaining > 0 {
+					lineBuf = append(lineBuf, chunk[:remaining]...)
+				}
+				for err == bufio.ErrBufferFull {
+					_, err = br.ReadSlice('\n')
+				}
+				lineCount++
+				s.processLine(path, lineBuf, lineCount, &matches, &matchCount, &beforeBuf, &afterCount, &lastPrintedLineNum)
+				lineBuf = lineBuf[:0]
+				if err == io.EOF {
+					break
+				}
+				if err == nil {
+					if s.maxCount > 0 && matchCount >= s.maxCount {
+						break
+					}
+					continue
+				}
+			}
 			lineBuf = append(lineBuf, chunk...)
 			if err == bufio.ErrBufferFull {
 				// Line too long for ReadSlice buffer, read more in next iterations

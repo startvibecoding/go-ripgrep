@@ -224,3 +224,156 @@ func TestSDKSearchCancellationStopsWork(t *testing.T) {
 		t.Fatal("search did not stop promptly after cancellation")
 	}
 }
+
+func TestSDKSearchSortByPath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create files in unsorted order
+	files := []string{"c.txt", "a.txt", "b.txt"}
+	for _, name := range files {
+		if err := os.WriteFile(filepath.Join(tmpDir, name), []byte("needle\n"), 0644); err != nil {
+			t.Fatalf("failed to write %s: %v", name, err)
+		}
+	}
+
+	resultsChan, err := Search(context.Background(), []string{tmpDir}, Options{
+		Pattern: "needle",
+		SortBy:  "path",
+	})
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	var paths []string
+	for res := range resultsChan {
+		paths = append(paths, filepath.Base(res.Path))
+	}
+
+	if len(paths) != 3 {
+		t.Fatalf("expected 3 results, got %d: %v", len(paths), paths)
+	}
+
+	// Should be sorted alphabetically
+	if paths[0] != "a.txt" || paths[1] != "b.txt" || paths[2] != "c.txt" {
+		t.Errorf("expected sorted order [a.txt, b.txt, c.txt], got %v", paths)
+	}
+}
+
+func TestSDKSearchSortReverse(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	files := []string{"c.txt", "a.txt", "b.txt"}
+	for _, name := range files {
+		if err := os.WriteFile(filepath.Join(tmpDir, name), []byte("needle\n"), 0644); err != nil {
+			t.Fatalf("failed to write %s: %v", name, err)
+		}
+	}
+
+	resultsChan, err := Search(context.Background(), []string{tmpDir}, Options{
+		Pattern:     "needle",
+		SortBy:      "path",
+		SortReverse: true,
+	})
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	var paths []string
+	for res := range resultsChan {
+		paths = append(paths, filepath.Base(res.Path))
+	}
+
+	if len(paths) != 3 {
+		t.Fatalf("expected 3 results, got %d: %v", len(paths), paths)
+	}
+
+	if paths[0] != "c.txt" || paths[1] != "b.txt" || paths[2] != "a.txt" {
+		t.Errorf("expected reverse sorted order [c.txt, b.txt, a.txt], got %v", paths)
+	}
+}
+
+func TestSDKSearchReplace(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("hello world\nfoo bar\n"), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	resultsChan, err := Search(context.Background(), []string{tmpDir}, Options{
+		Pattern:    "world",
+		IsFixed:    true,
+		Replace:    "earth",
+		HasReplace: true,
+	})
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	var found bool
+	for res := range resultsChan {
+		found = true
+		if len(res.Matches) != 1 {
+			t.Errorf("expected 1 match, got %d", len(res.Matches))
+		}
+		if res.Matches[0].Line != "hello earth" {
+			t.Errorf("expected 'hello earth', got %q", res.Matches[0].Line)
+		}
+	}
+
+	if !found {
+		t.Error("expected to find a match")
+	}
+}
+
+func TestSDKSearchMaxDepth(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	nestedDir := filepath.Join(tmpDir, "level1", "level2", "level3")
+	if err := os.MkdirAll(nestedDir, 0755); err != nil {
+		t.Fatalf("failed to create nested dirs: %v", err)
+	}
+
+	// Write a matching file at each level
+	for _, dir := range []string{tmpDir, filepath.Join(tmpDir, "level1"), nestedDir} {
+		if err := os.WriteFile(filepath.Join(dir, "match.txt"), []byte("needle\n"), 0644); err != nil {
+			t.Fatalf("failed to write file: %v", err)
+		}
+	}
+
+	resultsChan, err := Search(context.Background(), []string{tmpDir}, Options{
+		Pattern:  "needle",
+		MaxDepth: 1,
+	})
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	count := 0
+	for range resultsChan {
+		count++
+	}
+
+	// With MaxDepth=1, we should only find the file in tmpDir root
+	// (level1/matches.txt is at depth 2, so it's skipped)
+	if count != 1 {
+		t.Errorf("expected 1 file with MaxDepth=1, got %d", count)
+	}
+
+	// With MaxDepth=2, we should also find the file in level1
+	resultsChan2, err := Search(context.Background(), []string{tmpDir}, Options{
+		Pattern:  "needle",
+		MaxDepth: 2,
+	})
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	count2 := 0
+	for range resultsChan2 {
+		count2++
+	}
+
+	if count2 != 2 {
+		t.Errorf("expected 2 files with MaxDepth=2, got %d", count2)
+	}
+}

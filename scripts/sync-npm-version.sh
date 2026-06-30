@@ -46,18 +46,16 @@ if (fs.existsSync(pkgPath)) {
 # Update all platform package.json files
 PACKAGES_DIR="$NPM_DIR/packages"
 if [ -d "$PACKAGES_DIR" ]; then
-  for pkgDir in "$PACKAGES_DIR"/*/; do
-    if [ -f "$pkgDir/package.json" ]; then
-      node -e "
-      const fs = require('fs');
-      const pkgPath = '${pkgDir}package.json';
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-      pkg.version = '$VERSION';
-      fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-      console.log('Updated: ' + pkgPath);
-      "
-    fi
-  done
+  while IFS= read -r -d '' pkgPath; do
+    node -e "
+    const fs = require('fs');
+    const pkgPath = '$pkgPath';
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    pkg.version = '$VERSION';
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+    console.log('Updated: ' + pkgPath);
+    "
+  done < <(find "$PACKAGES_DIR" -mindepth 2 -maxdepth 4 -name package.json -print0)
 fi
 
 echo "Version sync complete: $VERSION"

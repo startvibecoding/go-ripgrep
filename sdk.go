@@ -215,7 +215,7 @@ func walkDir(
 	}
 
 	// Push current directory's ignore rules to the stack
-	_ = stack.Push(dirPath)
+	stack.Push(dirPath)
 	defer stack.Pop()
 
 	entries, err := os.ReadDir(dirPath)

@@ -108,3 +108,105 @@ func TestSearcherCancellation(t *testing.T) {
 		t.Fatal("expected cancellation error, got nil")
 	}
 }
+
+func TestSearcherReplace(t *testing.T) {
+	m, err := matcher.BuildMatcher("world", true, false, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	content := []byte("hello world\nfoo bar\n")
+	s := NewSearcher(m, 0, 0, 0, false)
+	s.SetReplace("earth")
+
+	res, err := s.SearchReader(bytes.NewReader(content), "test.txt")
+	if err != nil {
+		t.Fatalf("failed to search: %v", err)
+	}
+
+	if len(res.Matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(res.Matches))
+	}
+
+	if res.Matches[0].Line != "hello earth" {
+		t.Errorf("expected 'hello earth', got %q", res.Matches[0].Line)
+	}
+
+	if len(res.Matches[0].Submatches) != 1 {
+		t.Fatalf("expected 1 submatch, got %d", len(res.Matches[0].Submatches))
+	}
+
+	if res.Matches[0].Submatches[0].Text != "earth" {
+		t.Errorf("expected submatch text 'earth', got %q", res.Matches[0].Submatches[0].Text)
+	}
+}
+
+func TestSearcherBinaryDetection(t *testing.T) {
+	m, err := matcher.BuildMatcher("hello", true, false, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Content with a NUL byte in the first 1024 bytes
+	content := make([]byte, 100)
+	copy(content, "hello\x00world\n")
+
+	s := NewSearcher(m, 0, 0, 0, false)
+	res, err := s.SearchReader(bytes.NewReader(content), "binary.bin")
+	if err != nil {
+		t.Fatalf("failed to search: %v", err)
+	}
+
+	if res.Stats.Matches != 0 {
+		t.Errorf("expected 0 matches for binary file, got %d", res.Stats.Matches)
+	}
+	if len(res.Matches) != 0 {
+		t.Errorf("expected 0 match items for binary file, got %d", len(res.Matches))
+	}
+}
+
+func TestSearcherMaxLineLength(t *testing.T) {
+	m, err := matcher.BuildMatcher("hello", true, false, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	longLine := append([]byte("hello"), bytes.Repeat([]byte("a"), maxLineLength+1)...)
+	content := append(longLine, '\n')
+	content = append(content, []byte("hello world\n")...)
+
+	s := NewSearcher(m, 0, 0, 0, false)
+	res, err := s.SearchReader(bytes.NewReader(content), "test.txt")
+	if err != nil {
+		t.Fatalf("failed to search: %v", err)
+	}
+
+	if res.Stats.Matches != 2 {
+		t.Errorf("expected 2 matches, got %d", res.Stats.Matches)
+	}
+	if len(res.Matches) != 2 {
+		t.Fatalf("expected 2 match items, got %d", len(res.Matches))
+	}
+	if len(res.Matches[0].Line) != maxLineLength {
+		t.Errorf("expected first long line to be truncated to %d bytes, got %d", maxLineLength, len(res.Matches[0].Line))
+	}
+}
+
+func TestSearcherMaxCount(t *testing.T) {
+	m, err := matcher.BuildMatcher("match", true, false, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	content := []byte("match line 1\nmatch line 2\nmatch line 3\nno match\n")
+	s := NewSearcher(m, 0, 0, 2, false)
+
+	res, err := s.SearchReader(bytes.NewReader(content), "test.txt")
+	if err != nil {
+		t.Fatalf("failed to search: %v", err)
+	}
+
+	if res.Stats.Matches != 2 {
+		t.Errorf("expected 2 matches (max-count), got %d", res.Stats.Matches)
+	}
+}

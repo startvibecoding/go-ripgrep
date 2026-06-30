@@ -1,6 +1,6 @@
 {
-  "name": "go-ripgrep",
-  "version": "0.0.1",
+  "name": "@startvibecoding/go-ripgrep",
+  "version": "0.0.4",
   "description": "Pure Go ripgrep implementation with AVX2 SIMD acceleration and no CGO dependencies",
   "bin": {
     "rg": "bin/rg"
@@ -33,15 +33,15 @@
     "node": ">=14"
   },
   "optionalDependencies": {
-    "go-ripgrep-linux-x64": "0.0.1",
-    "go-ripgrep-linux-arm64": "0.0.1",
-    "go-ripgrep-linux-loong64": "0.0.1",
-    "go-ripgrep-linux-musl-x64": "0.0.1",
-    "go-ripgrep-darwin-x64": "0.0.1",
-    "go-ripgrep-darwin-arm64": "0.0.1",
-    "go-ripgrep-win32-x64": "0.0.1",
-    "go-ripgrep-win32-arm64": "0.0.1",
-    "go-ripgrep-freebsd-x64": "0.0.1",
-    "go-ripgrep-freebsd-arm64": "0.0.1"
+    "@startvibecoding/go-ripgrep-linux-x64": "0.0.4",
+    "@startvibecoding/go-ripgrep-linux-arm64": "0.0.4",
+    "@startvibecoding/go-ripgrep-linux-loong64": "0.0.4",
+    "@startvibecoding/go-ripgrep-linux-musl-x64": "0.0.4",
+    "@startvibecoding/go-ripgrep-darwin-x64": "0.0.4",
+    "@startvibecoding/go-ripgrep-darwin-arm64": "0.0.4",
+    "@startvibecoding/go-ripgrep-win32-x64": "0.0.4",
+    "@startvibecoding/go-ripgrep-win32-arm64": "0.0.4",
+    "@startvibecoding/go-ripgrep-freebsd-x64": "0.0.4",
+    "@startvibecoding/go-ripgrep-freebsd-arm64": "0.0.4"
   }
 }

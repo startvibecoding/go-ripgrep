@@ -2,12 +2,13 @@
 .PHONY: build-linux build-linux-loong64 build-linux-musl build-darwin build-windows build-freebsd
 .PHONY: dist dist-linux dist-darwin dist-windows dist-tarball dist-zip
 .PHONY: clean-all checksums
-.PHONY: npm-version npm-packages npm-pack npm-publish-all
+.PHONY: npm-version npm-packages npm-pack npm-publish-all npm-publish-pre
 
 # Variables
 BINARY_NAME=rg
 PACKAGE_NAME=go-ripgrep
 VERSION=$(shell git describe --tags --abbrev=0 2>/dev/null || echo "0.0.1")
+PRE_VERSION=$(if $(filter %-pre,$(VERSION)),$(VERSION),$(VERSION)-pre)
 LDFLAGS=-ldflags "-s -w -X main.version=$(VERSION)"
 GOBUILD_FLAGS=-trimpath -mod=vendor
 DIST_DIR=dist
@@ -50,6 +51,7 @@ help:
 	@echo "  npm-packages     Build platform-specific npm packages"
 	@echo "  npm-pack         Pack main + all platform packages"
 	@echo "  npm-publish-all  Publish main + all platform packages"
+	@echo "  npm-publish-pre  Publish pre-release packages (--tag next)"
 	@echo ""
 	@echo "Other targets:"
 	@echo "  install          Install via go install"
@@ -214,12 +216,10 @@ npm-packages: build-all
 
 npm-pack: npm-version npm-packages
 	@echo "Packing platform packages..."
-	@for d in npm/packages/*/; do \
-		if [ -f "$$d/package.json" ]; then \
-			echo "  Packing $$(basename $$d)..."; \
-			cd "$$d" && npm pack && cd - > /dev/null; \
-			mv "$$d"/*.tgz npm/ 2>/dev/null || true; \
-		fi; \
+	@for d in $$(find npm/packages -mindepth 1 -maxdepth 3 -name package.json -exec dirname {} \; | sort); do \
+		echo "  Packing $$(basename $$d)..."; \
+		cd "$$d" && npm pack && cd - > /dev/null; \
+		mv "$$d"/*.tgz npm/ 2>/dev/null || true; \
 	done
 	@echo "Packing main package..."
 	cd npm && npm pack
@@ -227,12 +227,23 @@ npm-pack: npm-version npm-packages
 
 npm-publish-all: npm-version npm-packages
 	@echo "Publishing platform packages..."
-	@for d in npm/packages/*/; do \
-		if [ -f "$$d/package.json" ]; then \
-			echo "  Publishing $$(basename $$d)..."; \
-			cd "$$d" && npm publish --tag latest && cd - > /dev/null; \
-		fi; \
+	@for d in $$(find npm/packages -mindepth 1 -maxdepth 3 -name package.json -exec dirname {} \; | sort); do \
+		echo "  Publishing $$(basename $$d)..."; \
+		cd "$$d" && npm publish --tag latest --access public && cd - > /dev/null; \
 	done
 	@echo "Publishing main package..."
-	cd npm && npm publish --tag latest
+	cd npm && npm publish --tag latest --access public
 	@echo "Published all packages!"
+
+# Publish pre-release
+npm-publish-pre:
+	./scripts/sync-npm-version.sh $(PRE_VERSION)
+	$(MAKE) npm-packages VERSION=$(PRE_VERSION)
+	@echo "Publishing platform packages (pre-release)..."
+	@for d in $$(find npm/packages -mindepth 1 -maxdepth 3 -name package.json -exec dirname {} \; | sort); do \
+		echo "  Publishing $$(basename $$d)..."; \
+		cd "$$d" && npm publish --tag next --access public && cd - > /dev/null; \
+	done
+	@echo "Publishing main package (pre-release)..."
+	cd npm && npm publish --tag next --access public
+	@echo "Published all packages (pre-release)!"

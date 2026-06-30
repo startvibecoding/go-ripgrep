@@ -81,24 +81,35 @@ OPTIONS:
     -w, --word-regexp          Match whole words only.
     -F, --fixed-strings        Treat PATTERN as a literal string.
     -v, --invert-match         Invert match: select non-matching lines.
+    -r, --replace STR          Replace matches with STR.
     -g, --glob GLOB            Include or exclude files/directories using globs.
+    -t, --type TYPE            Only search files matching TYPE.
+    -T, --type-not TYPE        Do not search files matching TYPE.
+        --type-list            Show all supported file types.
     -A, --after-context NUM    Show NUM lines after each match.
     -B, --before-context NUM   Show NUM lines before each match.
     -C, --context NUM          Show NUM lines before and after each match.
     -m, --max-count NUM        Limit matches per file to NUM.
     -j, --threads NUM          Number of threads to use.
-    --hidden                   Search hidden files and directories.
-    --no-ignore                Do not respect ignore files (.gitignore, .ignore, etc.).
+        --hidden               Search hidden files and directories.
+        --no-ignore            Do not respect ignore files (.gitignore, .ignore, etc.).
     -L, --follow               Follow symbolic links.
-    --json                     Output newline-delimited JSON.
-    --color WHEN               Whether to use color: always, never, auto. [default: auto]
-    --heading                  Print heading for matches from each file. [default: when on terminal]
-    --no-heading               Do not print heading for matches.
+        --json                 Output newline-delimited JSON.
+        --color WHEN           Whether to use color: always, never, auto. [default: auto]
+        --heading              Print heading for matches from each file. [default: when on terminal]
+        --no-heading           Do not print heading for matches.
     -n, --line-number          Show line numbers. [default: on]
     -N, --no-line-number       Suppress line numbers.
     -H, --with-filename        Print the file path for each match.
     -I, --no-filename          Suppress file path for each match.
-    --column                   Show 1-based column number of first match.
+        --column               Show 1-based column number of first match.
+    -o, --only-matching        Show only matching parts of lines.
+    -c, --count                Show only match count per file.
+    -q, --quiet                Suppress output; exit 0 if match found.
+    -z, --search-zip           Search inside compressed files (gz, bz2, zip).
+        --sort SORT            Sort results by: path, modified, size, none.
+        --sortr SORT           Sort results in reverse order.
+        --max-depth NUM        Limit directory traversal depth.
     -h, --help                 Print this help message.
     -V, --version              Print version information.
 `
@@ -314,9 +325,85 @@ func parseArgs(args []string) (*CliArgs, error) {
 		Color: "auto",
 	}
 
-	n := len(args)
-	for i := 0; i < n; i++ {
+	// Flag definitions: each entry describes a long flag, optional short flag,
+	// whether it needs a value, and how to apply it.
+	type flagDef struct {
+		long       string
+		short      rune
+		needsValue bool
+		apply      func(cli *CliArgs, value string) error
+	}
+
+	flags := []flagDef{
+		// Boolean flags (no value)
+		{long: "ignore-case", short: 'i', apply: func(c *CliArgs, _ string) error { c.CaseInsensitive = true; return nil }},
+		{long: "case-sensitive", short: 's', apply: func(c *CliArgs, _ string) error { c.CaseInsensitive = false; return nil }},
+		{long: "word-regexp", short: 'w', apply: func(c *CliArgs, _ string) error { c.WordRegexp = true; return nil }},
+		{long: "fixed-strings", short: 'F', apply: func(c *CliArgs, _ string) error { c.FixedStrings = true; return nil }},
+		{long: "invert-match", short: 'v', apply: func(c *CliArgs, _ string) error { c.InvertMatch = true; return nil }},
+		{long: "hidden", apply: func(c *CliArgs, _ string) error { c.Hidden = true; return nil }},
+		{long: "search-zip", short: 'z', apply: func(c *CliArgs, _ string) error { c.SearchZip = true; return nil }},
+		{long: "no-ignore", apply: func(c *CliArgs, _ string) error { c.NoIgnore = true; return nil }},
+		{long: "follow", short: 'L', apply: func(c *CliArgs, _ string) error { c.FollowSymlinks = true; return nil }},
+		{long: "json", apply: func(c *CliArgs, _ string) error { c.JSON = true; return nil }},
+		{long: "only-matching", short: 'o', apply: func(c *CliArgs, _ string) error { c.OnlyMatching = true; return nil }},
+		{long: "count", short: 'c', apply: func(c *CliArgs, _ string) error { c.Count = true; return nil }},
+		{long: "quiet", short: 'q', apply: func(c *CliArgs, _ string) error { c.Quiet = true; return nil }},
+		{long: "column", apply: func(c *CliArgs, _ string) error { c.Column = true; return nil }},
+		{long: "heading", apply: func(c *CliArgs, _ string) error { c.Heading = true; return nil }},
+		{long: "no-heading", apply: func(c *CliArgs, _ string) error { c.NoHeading = true; return nil }},
+		{long: "type-list", apply: func(c *CliArgs, _ string) error { c.TypeList = true; return nil }},
+
+		// Mutually-exclusive boolean pairs
+		{long: "line-number", short: 'n', apply: func(c *CliArgs, _ string) error { c.LineNumber = true; c.NoLineNumber = false; return nil }},
+		{long: "no-line-number", short: 'N', apply: func(c *CliArgs, _ string) error { c.NoLineNumber = true; c.LineNumber = false; return nil }},
+		{long: "with-filename", short: 'H', apply: func(c *CliArgs, _ string) error { c.WithFilename = true; c.NoFilename = false; return nil }},
+		{long: "no-filename", short: 'I', apply: func(c *CliArgs, _ string) error { c.NoFilename = true; c.WithFilename = false; return nil }},
+
+		// String value flags
+		{long: "replace", short: 'r', needsValue: true, apply: func(c *CliArgs, v string) error { c.Replace = v; c.HasReplace = true; return nil }},
+		{long: "type", short: 't', needsValue: true, apply: func(c *CliArgs, v string) error { c.Types = append(c.Types, v); return nil }},
+		{long: "type-not", short: 'T', needsValue: true, apply: func(c *CliArgs, v string) error { c.TypesNot = append(c.TypesNot, v); return nil }},
+		{long: "sort", needsValue: true, apply: func(c *CliArgs, v string) error { c.SortBy = v; return nil }},
+		{long: "sortr", needsValue: true, apply: func(c *CliArgs, v string) error { c.SortBy = v; c.SortReverse = true; return nil }},
+		{long: "glob", short: 'g', needsValue: true, apply: func(c *CliArgs, v string) error { c.Globs = append(c.Globs, v); return nil }},
+		{long: "color", needsValue: true, apply: func(c *CliArgs, v string) error { c.Color = v; return nil }},
+
+		// Integer value flags
+		{long: "after-context", short: 'A', needsValue: true, apply: intFlag(func(c *CliArgs, v int) { c.AfterContext = v })},
+		{long: "before-context", short: 'B', needsValue: true, apply: intFlag(func(c *CliArgs, v int) { c.BeforeContext = v })},
+		{long: "context", short: 'C', needsValue: true, apply: intFlag(func(c *CliArgs, v int) { c.BeforeContext = v; c.AfterContext = v })},
+		{long: "max-count", short: 'm', needsValue: true, apply: intFlag(func(c *CliArgs, v int) { c.MaxCount = v })},
+		{long: "threads", short: 'j', needsValue: true, apply: intFlag(func(c *CliArgs, v int) { c.Threads = v })},
+		{long: "max-depth", needsValue: true, apply: intFlag(func(c *CliArgs, v int) { c.MaxDepth = v })},
+	}
+
+	// Build lookup maps
+	longMap := make(map[string]*flagDef)
+	shortMap := make(map[rune]*flagDef)
+	for i := range flags {
+		f := &flags[i]
+		longMap[f.long] = f
+		if f.short != 0 {
+			shortMap[f.short] = f
+		}
+	}
+
+	// Helper: extract a value either from remaining runes or the next arg
+	extractValue := func(runes []rune, pos int, argIdx int) (string, int, int) {
+		if pos+1 < len(runes) {
+			return string(runes[pos+1:]), len(runes), argIdx
+		}
+		if argIdx+1 < len(args) {
+			return args[argIdx+1], pos, argIdx + 1
+		}
+		return "", pos, argIdx
+	}
+
+	for i := 0; i < len(args); i++ {
 		arg := args[i]
+
+		// Special early-exit flags
 		if arg == "-h" || arg == "--help" {
 			cli.Help = true
 			return cli, nil
@@ -336,384 +423,47 @@ func parseArgs(args []string) (*CliArgs, error) {
 				hasValue = true
 			}
 
-			switch name {
-			case "ignore-case":
-				cli.CaseInsensitive = true
-			case "case-sensitive":
-				cli.CaseInsensitive = false
-			case "word-regexp":
-				cli.WordRegexp = true
-			case "fixed-strings":
-				cli.FixedStrings = true
-			case "invert-match":
-				cli.InvertMatch = true
-			case "hidden":
-				cli.Hidden = true
-			case "search-zip":
-				cli.SearchZip = true
-			case "no-ignore":
-				cli.NoIgnore = true
-			case "follow":
-				cli.FollowSymlinks = true
-			case "json":
-				cli.JSON = true
-			case "only-matching":
-				cli.OnlyMatching = true
-			case "count":
-				cli.Count = true
-			case "quiet":
-				cli.Quiet = true
-			case "replace":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --replace requires a value")
-					}
-				}
-				cli.Replace = value
-				cli.HasReplace = true
-			case "type":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --type requires a value")
-					}
-				}
-				cli.Types = append(cli.Types, value)
-			case "type-not":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --type-not requires a value")
-					}
-				}
-				cli.TypesNot = append(cli.TypesNot, value)
-			case "type-list":
-				cli.TypeList = true
-			case "sort":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --sort requires a value")
-					}
-				}
-				cli.SortBy = value
-			case "sortr":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --sortr requires a value")
-					}
-				}
-				cli.SortBy = value
-				cli.SortReverse = true
-			case "column":
-				cli.Column = true
-			case "heading":
-				cli.Heading = true
-			case "no-heading":
-				cli.NoHeading = true
-			case "line-number":
-				cli.LineNumber = true
-				cli.NoLineNumber = false
-			case "no-line-number":
-				cli.NoLineNumber = true
-				cli.LineNumber = false
-			case "with-filename":
-				cli.WithFilename = true
-				cli.NoFilename = false
-			case "no-filename":
-				cli.NoFilename = true
-				cli.WithFilename = false
-			case "glob":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --glob requires a value")
-					}
-				}
-				cli.Globs = append(cli.Globs, value)
-			case "after-context":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --after-context requires a value")
-					}
-				}
-				val, err := strconv.Atoi(value)
-				if err != nil {
-					return nil, fmt.Errorf("error: --after-context invalid integer: %s", value)
-				}
-				cli.AfterContext = val
-			case "before-context":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --before-context requires a value")
-					}
-				}
-				val, err := strconv.Atoi(value)
-				if err != nil {
-					return nil, fmt.Errorf("error: --before-context invalid integer: %s", value)
-				}
-				cli.BeforeContext = val
-			case "context":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --context requires a value")
-					}
-				}
-				val, err := strconv.Atoi(value)
-				if err != nil {
-					return nil, fmt.Errorf("error: --context invalid integer: %s", value)
-				}
-				cli.BeforeContext = val
-				cli.AfterContext = val
-			case "max-count":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --max-count requires a value")
-					}
-				}
-				val, err := strconv.Atoi(value)
-				if err != nil {
-					return nil, fmt.Errorf("error: --max-count invalid integer: %s", value)
-				}
-				cli.MaxCount = val
-			case "threads":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --threads requires a value")
-					}
-				}
-				val, err := strconv.Atoi(value)
-				if err != nil {
-					return nil, fmt.Errorf("error: --threads invalid integer: %s", value)
-				}
-				cli.Threads = val
-			case "color":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --color requires a value")
-					}
-				}
-				cli.Color = value
-			case "max-depth":
-				if !hasValue {
-					if i+1 < n {
-						value = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: --max-depth requires a value")
-					}
-				}
-				val, err := strconv.Atoi(value)
-				if err != nil {
-					return nil, fmt.Errorf("error: --max-depth invalid integer: %s", value)
-				}
-				cli.MaxDepth = val
-			default:
+			f, ok := longMap[name]
+			if !ok {
 				return nil, fmt.Errorf("error: unknown flag: %s", arg)
 			}
+
+			if f.needsValue {
+				if !hasValue {
+					if i+1 < len(args) {
+						value = args[i+1]
+						i++
+					} else {
+						return nil, fmt.Errorf("error: --%s requires a value", f.long)
+					}
+				}
+				if err := f.apply(cli, value); err != nil {
+					return nil, err
+				}
+			} else {
+				_ = f.apply(cli, "")
+			}
 		} else if strings.HasPrefix(arg, "-") && arg != "-" {
-			// Parse short flags
 			runes := []rune(arg[1:])
 			for j := 0; j < len(runes); j++ {
 				r := runes[j]
-				switch r {
-				case 'i':
-					cli.CaseInsensitive = true
-				case 's':
-					cli.CaseInsensitive = false
-				case 'w':
-					cli.WordRegexp = true
-				case 'F':
-					cli.FixedStrings = true
-				case 'v':
-					cli.InvertMatch = true
-				case 'L':
-					cli.FollowSymlinks = true
-				case 'o':
-					cli.OnlyMatching = true
-				case 'c':
-					cli.Count = true
-				case 'q':
-					cli.Quiet = true
-				case 'z':
-					cli.SearchZip = true
-				case 'r':
-					val := ""
-					if j+1 < len(runes) {
-						val = string(runes[j+1:])
-						j = len(runes) // consume the rest
-					} else if i+1 < n {
-						val = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: -r requires a value")
-					}
-					cli.Replace = val
-					cli.HasReplace = true
-				case 't':
-					val := ""
-					if j+1 < len(runes) {
-						val = string(runes[j+1:])
-						j = len(runes) // consume the rest
-					} else if i+1 < n {
-						val = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: -t requires a value")
-					}
-					cli.Types = append(cli.Types, val)
-				case 'T':
-					val := ""
-					if j+1 < len(runes) {
-						val = string(runes[j+1:])
-						j = len(runes) // consume the rest
-					} else if i+1 < n {
-						val = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: -T requires a value")
-					}
-					cli.TypesNot = append(cli.TypesNot, val)
-				case 'n':
-					cli.LineNumber = true
-					cli.NoLineNumber = false
-				case 'N':
-					cli.NoLineNumber = true
-					cli.LineNumber = false
-				case 'H':
-					cli.WithFilename = true
-					cli.NoFilename = false
-				case 'I':
-					cli.NoFilename = true
-					cli.WithFilename = false
-				case 'g':
-					// Glob needs a value. Check remaining chars first.
-					val := ""
-					if j+1 < len(runes) {
-						val = string(runes[j+1:])
-						j = len(runes) // consume the rest
-					} else if i+1 < n {
-						val = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: -g requires a value")
-					}
-					cli.Globs = append(cli.Globs, val)
-				case 'A':
-					valStr := ""
-					if j+1 < len(runes) {
-						valStr = string(runes[j+1:])
-						j = len(runes)
-					} else if i+1 < n {
-						valStr = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: -A requires a value")
-					}
-					val, err := strconv.Atoi(valStr)
-					if err != nil {
-						return nil, fmt.Errorf("error: -A invalid integer: %s", valStr)
-					}
-					cli.AfterContext = val
-				case 'B':
-					valStr := ""
-					if j+1 < len(runes) {
-						valStr = string(runes[j+1:])
-						j = len(runes)
-					} else if i+1 < n {
-						valStr = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: -B requires a value")
-					}
-					val, err := strconv.Atoi(valStr)
-					if err != nil {
-						return nil, fmt.Errorf("error: -B invalid integer: %s", valStr)
-					}
-					cli.BeforeContext = val
-				case 'C':
-					valStr := ""
-					if j+1 < len(runes) {
-						valStr = string(runes[j+1:])
-						j = len(runes)
-					} else if i+1 < n {
-						valStr = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: -C requires a value")
-					}
-					val, err := strconv.Atoi(valStr)
-					if err != nil {
-						return nil, fmt.Errorf("error: -C invalid integer: %s", valStr)
-					}
-					cli.BeforeContext = val
-					cli.AfterContext = val
-				case 'm':
-					valStr := ""
-					if j+1 < len(runes) {
-						valStr = string(runes[j+1:])
-						j = len(runes)
-					} else if i+1 < n {
-						valStr = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: -m requires a value")
-					}
-					val, err := strconv.Atoi(valStr)
-					if err != nil {
-						return nil, fmt.Errorf("error: -m invalid integer: %s", valStr)
-					}
-					cli.MaxCount = val
-				case 'j':
-					valStr := ""
-					if j+1 < len(runes) {
-						valStr = string(runes[j+1:])
-						j = len(runes)
-					} else if i+1 < n {
-						valStr = args[i+1]
-						i++
-					} else {
-						return nil, fmt.Errorf("error: -j requires a value")
-					}
-					val, err := strconv.Atoi(valStr)
-					if err != nil {
-						return nil, fmt.Errorf("error: -j invalid integer: %s", valStr)
-					}
-					cli.Threads = val
-				default:
+				f, ok := shortMap[r]
+				if !ok {
 					return nil, fmt.Errorf("error: unknown flag: -%c", r)
+				}
+
+				if f.needsValue {
+					val, newJ, newI := extractValue(runes, j, i)
+					if val == "" {
+						return nil, fmt.Errorf("error: -%c requires a value", r)
+					}
+					j = newJ
+					i = newI
+					if err := f.apply(cli, val); err != nil {
+						return nil, err
+					}
+				} else {
+					_ = f.apply(cli, "")
 				}
 			}
 		} else {
@@ -727,6 +477,18 @@ func parseArgs(args []string) (*CliArgs, error) {
 	}
 
 	return cli, nil
+}
+
+// intFlag wraps a func(*CliArgs, int) as a func(*CliArgs, string) error for use in flagDef.
+func intFlag(set func(*CliArgs, int)) func(*CliArgs, string) error {
+	return func(c *CliArgs, v string) error {
+		val, err := strconv.Atoi(v)
+		if err != nil {
+			return fmt.Errorf("error: invalid integer: %s", v)
+		}
+		set(c, val)
+		return nil
+	}
 }
 
 func isStdinTerminal() bool {

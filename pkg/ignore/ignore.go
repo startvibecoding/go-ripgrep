@@ -37,7 +37,7 @@ func NewIgnoreStack(noIgnore, hidden bool, maxDepth int) *IgnoreStack {
 }
 
 // LoadBaseRules searches for global ignore files and climbs parent directories of startPath
-// to pre-populate the ignore stack.
+// to pre-populate the ignore stack. It climbs at most 64 levels to avoid unbounded traversal.
 func (s *IgnoreStack) LoadBaseRules(startPath string) {
 	if s.NoIgnore {
 		return

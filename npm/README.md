@@ -1,4 +1,4 @@
-# go-ripgrep (NPM Installer)
+# @startvibecoding/go-ripgrep (NPM Installer)
 
 Pure Go implementation of [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) with handwritten AVX2 SIMD optimizations, zero-allocation fast-paths, and zero CGO dependencies.
 
@@ -7,13 +7,13 @@ Pure Go implementation of [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`
 Install globally via npm:
 
 ```bash
-npm install -g go-ripgrep
+npm install -g @startvibecoding/go-ripgrep
 ```
 
 Or run via `npx`:
 
 ```bash
-npx go-ripgrep --help
+npx @startvibecoding/go-ripgrep --help
 ```
 
 ## Features

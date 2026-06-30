@@ -10,16 +10,16 @@ const fs = require('fs');
 
 // Map npm os/cpu to package name
 const PLATFORM_MAP = {
-  'linux-x64-glibc': 'go-ripgrep-linux-x64',
-  'linux-arm64-glibc': 'go-ripgrep-linux-arm64',
-  'linux-loong64-glibc': 'go-ripgrep-linux-loong64',
-  'linux-x64-musl': 'go-ripgrep-linux-musl-x64',
-  'darwin-x64': 'go-ripgrep-darwin-x64',
-  'darwin-arm64': 'go-ripgrep-darwin-arm64',
-  'win32-x64': 'go-ripgrep-win32-x64',
-  'win32-arm64': 'go-ripgrep-win32-arm64',
-  'freebsd-x64': 'go-ripgrep-freebsd-x64',
-  'freebsd-arm64': 'go-ripgrep-freebsd-arm64',
+  'linux-x64-glibc': '@startvibecoding/go-ripgrep-linux-x64',
+  'linux-arm64-glibc': '@startvibecoding/go-ripgrep-linux-arm64',
+  'linux-loong64-glibc': '@startvibecoding/go-ripgrep-linux-loong64',
+  'linux-x64-musl': '@startvibecoding/go-ripgrep-linux-musl-x64',
+  'darwin-x64': '@startvibecoding/go-ripgrep-darwin-x64',
+  'darwin-arm64': '@startvibecoding/go-ripgrep-darwin-arm64',
+  'win32-x64': '@startvibecoding/go-ripgrep-win32-x64',
+  'win32-arm64': '@startvibecoding/go-ripgrep-win32-arm64',
+  'freebsd-x64': '@startvibecoding/go-ripgrep-freebsd-x64',
+  'freebsd-arm64': '@startvibecoding/go-ripgrep-freebsd-arm64',
 };
 
 function detectPlatform() {
